@@ -93,7 +93,7 @@ class Engine:
             if wind.confidence > 0:
                 end = at
             geometry = move_geometry(track.geometry, self.grid, winds, track.altitude_m, track.position_at, end)
-            expired = at >= track.expires_at
+            expired = track.status == "expired" or at >= track.expires_at
             current[key] = replace(track, geometry=geometry, position_at=end, version=track.version+1,
                                    observed_at=at if wind.confidence > 0 else track.observed_at,
                                    status="expired" if expired else "active" if wind.confidence > 0 else "uncertain",

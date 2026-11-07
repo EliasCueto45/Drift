@@ -3,7 +3,7 @@ import json
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 from jsonschema import Draft202012Validator
 from shapely.geometry import shape
@@ -16,6 +16,12 @@ class Conflict(RuntimeError):
     pass
 
 
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Never forward the worker bearer credential to a redirected endpoint.
+        return None
+
+
 class ApiClient:
     def __init__(self, base_url, secret, schema, attempts=4, timeout=20):
         parsed = urlparse(base_url)
@@ -25,6 +31,7 @@ class ApiClient:
             raise ValueError("invalid API configuration")
         self.base, self.secret = base_url.rstrip("/"), secret
         self.attempts, self.timeout = attempts, timeout
+        self.opener = build_opener(NoRedirect())
         Draft202012Validator.check_schema(schema)
         self.validator = Draft202012Validator(schema)
 
@@ -34,8 +41,11 @@ class ApiClient:
             request = Request(self.base+path, body, {"Authorization": f"Bearer {self.secret}",
                               "Content-Type": "application/json"}, method=method)
             try:
-                with urlopen(request, timeout=self.timeout) as response:
-                    return json.loads(response.read(20_000_001))
+                with self.opener.open(request, timeout=self.timeout) as response:
+                    raw = response.read(20_000_001)
+                    if len(raw) > 20_000_000:
+                        raise RuntimeError("tracking API response exceeds 20 MB")
+                    return json.loads(raw)
             except HTTPError as error:
                 if error.code == 409:
                     raise Conflict("tracking state conflict; pending batch retained") from None

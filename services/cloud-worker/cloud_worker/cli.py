@@ -11,6 +11,16 @@ from .models import Grid
 from .state import Journal
 
 
+def bind_destination(state_dir, destination):
+    """A checkpoint cannot silently skip delivery to a newly selected sink."""
+    path = state_dir/"destination.json"
+    if path.exists():
+        if json.loads(path.read_text(encoding="utf-8")) != destination:
+            raise ValueError("state directory belongs to another output/API; use a new state directory")
+    else:
+        path.write_text(json.dumps(destination), encoding="utf-8")
+
+
 class JsonlSink:
     def __init__(self, path):
         self.path = Path(path)
@@ -68,8 +78,10 @@ def main(argv=None):
                     raise ValueError("publishing requires Owner 4's canonical --batch-schema")
                 schema = json.loads(args.batch_schema.read_text(encoding="utf-8"))
                 sink = ApiClient(os.environ["DRIFT_API_BASE_URL"], os.environ["TRACKING_INGEST_SECRET"], schema)
+                bind_destination(args.state_dir, {"api": sink.base})
             else:
                 sink = JsonlSink(args.output)
+                bind_destination(args.state_dir, {"file": str(args.output.resolve())})
             flush(journal, sink)
             inputs = observation_inputs(args.manifest, args.state_dir/"cache") if args.manifest else synthetic_inputs(fixture)
             count = 0

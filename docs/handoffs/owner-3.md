@@ -22,4 +22,6 @@ Integration detail for Owners 2/4: `hold` with null target preserves content as 
 
 Completed delivery slice: atomic JSON checkpoint/outbox, exact lost-ack resends, authenticated/paginated state client, version-conflict reconciliation, NOAA/local product acquisition, replay/live CLI isolation and synthetic Troy fixture. Canonical JSON Schema is mandatory before publishing. See `docs/decisions/owner-3-tracking-integration.md` for precise state/ack/hold semantics requiring Owners 2/4 review.
 
-Next: broader numerical/failure regressions, operational README/environment template and final verification. No backend exists yet; HTTP integration is not claimed.
+Completed correctness slice (commit 7): 24 tests pass, including horizon freeze, local overcast clearing, orphan/restart/reassociation, version-conflict recomputation and loopback authenticated HTTP retry. Fixed deleted-created-cloud resurrection and checkpoint destination changes; API redirects cannot forward the worker credential.
+
+An eighth commit will contain operational docs, environment/manifest examples and reproducible dependency locking. No real backend or live NOAA input has been validated. NetCDF imports emit a NumPy binary-size runtime warning in this environment; NetCDF read/write/navigation tests pass, but record it as a deployment dependency check.
