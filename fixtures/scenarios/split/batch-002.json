@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-split-b002",
+  "datasetId": "fx-split",
+  "trackingRunId": "fx-split-run1",
+  "sequence": 2,
+  "observedAt": "2026-10-24T15:10:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_sp_m",
+      "version": 2,
+      "kind": "observed",
+      "status": "expired",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.777499,
+                42.665448
+              ],
+              [
+                -73.606101,
+                42.665448
+              ],
+              [
+                -73.606101,
+                42.791352
+              ],
+              [
+                -73.777499,
+                42.791352
+              ],
+              [
+                -73.777499,
+                42.665448
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-split",
+      "trackingRunId": "fx-split-run1"
+    },
+    {
+      "id": "cld_sp_s1",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.789741,
+                42.70142
+              ],
+              [
+                -73.716285,
+                42.70142
+              ],
+              [
+                -73.716285,
+                42.75538
+              ],
+              [
+                -73.789741,
+                42.75538
+              ],
+              [
+                -73.789741,
+                42.70142
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [
+        "cld_sp_m"
+      ],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-split",
+      "trackingRunId": "fx-split-run1"
+    },
+    {
+      "id": "cld_sp_s2",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.667315,
+                42.70142
+              ],
+              [
+                -73.593859,
+                42.70142
+              ],
+              [
+                -73.593859,
+                42.75538
+              ],
+              [
+                -73.667315,
+                42.75538
+              ],
+              [
+                -73.667315,
+                42.70142
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [
+        "cld_sp_m"
+      ],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-split",
+      "trackingRunId": "fx-split-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-split-e2",
+      "type": "split",
+      "sourceCloudIds": [
+        "cld_sp_m"
+      ],
+      "targetCloudIds": [
+        "cld_sp_s1",
+        "cld_sp_s2"
+      ],
+      "effectiveAt": "2026-10-24T15:10:00.000Z"
+    }
+  ],
+  "anchorUpdates": [
+    {
+      "messageId": "msg_sp_l",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_sp_s1",
+      "anchor": {
+        "longitude": -73.753013,
+        "latitude": 42.7284
+      },
+      "action": "move"
+    },
+    {
+      "messageId": "msg_sp_r",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_sp_s2",
+      "anchor": {
+        "longitude": -73.630587,
+        "latitude": 42.7284
+      },
+      "action": "move"
+    }
+  ]
+}

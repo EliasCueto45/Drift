@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-overcast-b001",
+  "datasetId": "fx-overcast",
+  "trackingRunId": "fx-overcast-run1",
+  "sequence": 1,
+  "observedAt": "2026-10-24T15:00:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_overcast",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.997867,
+                42.50357
+              ],
+              [
+                -73.385733,
+                42.50357
+              ],
+              [
+                -73.385733,
+                42.95323
+              ],
+              [
+                -73.997867,
+                42.95323
+              ],
+              [
+                -73.997867,
+                42.50357
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:00:00.000Z",
+      "updatedAt": "2026-10-24T15:00:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:00:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-overcast",
+      "trackingRunId": "fx-overcast-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-overcast-e1",
+      "type": "created",
+      "sourceCloudIds": [],
+      "targetCloudIds": [
+        "cld_overcast"
+      ],
+      "effectiveAt": "2026-10-24T15:00:00.000Z"
+    }
+  ],
+  "anchorUpdates": []
+}

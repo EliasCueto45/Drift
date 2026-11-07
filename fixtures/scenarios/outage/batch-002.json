@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-outage-b002",
+  "datasetId": "fx-outage",
+  "trackingRunId": "fx-outage-run1",
+  "sequence": 2,
+  "observedAt": "2026-10-24T15:45:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_out",
+      "version": 2,
+      "kind": "observed",
+      "status": "uncertain",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.495917,
+                42.710414
+              ],
+              [
+                -73.446947,
+                42.710414
+              ],
+              [
+                -73.446947,
+                42.746386
+              ],
+              [
+                -73.495917,
+                42.746386
+              ],
+              [
+                -73.495917,
+                42.710414
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:45:00.000Z",
+      "updatedAt": "2026-10-24T15:45:00.000Z",
+      "confidence": 0.2,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:45:00.000Z",
+        "confidence": 0.3
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-outage",
+      "trackingRunId": "fx-outage-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-outage-e2",
+      "type": "uncertain",
+      "sourceCloudIds": [
+        "cld_out"
+      ],
+      "targetCloudIds": [
+        "cld_out"
+      ],
+      "effectiveAt": "2026-10-24T15:45:00.000Z"
+    }
+  ],
+  "anchorUpdates": [
+    {
+      "messageId": "msg_out_1",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_out",
+      "anchor": {
+        "longitude": -73.6918,
+        "latitude": 42.7284
+      },
+      "action": "hold"
+    }
+  ]
+}

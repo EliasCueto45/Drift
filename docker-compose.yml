@@ -1,0 +1,26 @@
+# Optional. If you prefer hosted Postgres (Neon/Supabase, both support PostGIS),
+# skip `db` and point DATABASE_URL at it.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: drift
+      POSTGRES_PASSWORD: drift
+      POSTGRES_DB: drift
+    ports: ["5432:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drift"]
+      interval: 5s
+      retries: 10
+  storage:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: drift
+      MINIO_ROOT_PASSWORD: driftdriftdrift
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+volumes:
+  dbdata:
+  miniodata:

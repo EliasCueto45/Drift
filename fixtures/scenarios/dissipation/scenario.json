@@ -1,0 +1,56 @@
+{
+  "name": "dissipation",
+  "description": "Clear obs #1 (t+5), #2 (t+10), #3 (t+16): only after #3 does the cloud dissipate and the note expire.",
+  "datasetId": "fx-dissipation",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json",
+    "batch-002.json",
+    "batch-003.json",
+    "batch-004.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_ds_1",
+        "version": 1,
+        "cloudId": "cld_ds",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.6918,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "this one will clear",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      }
+    ]
+  },
+  "expect": {
+    "expiredCloudIds": [
+      "cld_ds"
+    ],
+    "expiredMessageIds": [
+      "msg_ds_1"
+    ],
+    "notExpiredAfterSequence": {
+      "3": [
+        "msg_ds_1"
+      ]
+    }
+  }
+}

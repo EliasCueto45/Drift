@@ -1,0 +1,75 @@
+{
+  "name": "scattered-advection",
+  "description": "Two clouds; west wind 10 m/s moves everything ~6 km east over 10 min.",
+  "datasetId": "fx-scattered",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json",
+    "batch-002.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_scat_a1",
+        "version": 1,
+        "cloudId": "cld_scat_a",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.765256,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "hello from cloud A",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      },
+      {
+        "id": "msg_scat_b1",
+        "version": 1,
+        "cloudId": "cld_scat_b",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.667315,
+          "latitude": 42.773366
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "hello from cloud B",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      }
+    ]
+  },
+  "expect": {
+    "activeCloudIds": [
+      "cld_scat_a",
+      "cld_scat_b"
+    ],
+    "movedMessages": {
+      "msg_scat_a1": {
+        "eastM": 6000
+      },
+      "msg_scat_b1": {
+        "eastM": 6000
+      }
+    }
+  }
+}

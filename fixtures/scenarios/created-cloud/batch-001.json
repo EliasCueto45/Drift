@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-created-b001",
+  "datasetId": "fx-created",
+  "trackingRunId": "fx-created-run1",
+  "sequence": 1,
+  "observedAt": "2026-10-24T15:00:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_created",
+      "version": 1,
+      "kind": "created",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.72242,
+                42.732897
+              ],
+              [
+                -73.66118,
+                42.732897
+              ],
+              [
+                -73.66118,
+                42.777863
+              ],
+              [
+                -73.72242,
+                42.777863
+              ],
+              [
+                -73.72242,
+                42.732897
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:00:00.000Z",
+      "updatedAt": "2026-10-24T15:00:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:00:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": "user_fixture_alice",
+      "expiresAt": "2026-10-25T15:00:00.000Z",
+      "datasetId": "fx-created",
+      "trackingRunId": "fx-created-run1"
+    },
+    {
+      "id": "cld_created_neighbor",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.710172,
+                42.7284
+              ],
+              [
+                -73.636684,
+                42.7284
+              ],
+              [
+                -73.636684,
+                42.782359
+              ],
+              [
+                -73.710172,
+                42.782359
+              ],
+              [
+                -73.710172,
+                42.7284
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:00:00.000Z",
+      "updatedAt": "2026-10-24T15:00:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:00:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-created",
+      "trackingRunId": "fx-created-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-created-e1",
+      "type": "created",
+      "sourceCloudIds": [],
+      "targetCloudIds": [
+        "cld_created"
+      ],
+      "effectiveAt": "2026-10-24T15:00:00.000Z"
+    }
+  ],
+  "anchorUpdates": []
+}

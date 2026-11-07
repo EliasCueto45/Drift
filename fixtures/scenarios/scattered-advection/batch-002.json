@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-scattered-b002",
+  "datasetId": "fx-scattered",
+  "trackingRunId": "fx-scattered-run1",
+  "sequence": 2,
+  "observedAt": "2026-10-24T15:10:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_scat_a",
+      "version": 2,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.716285,
+                42.710414
+              ],
+              [
+                -73.667315,
+                42.710414
+              ],
+              [
+                -73.667315,
+                42.746386
+              ],
+              [
+                -73.716285,
+                42.746386
+              ],
+              [
+                -73.716285,
+                42.710414
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-scattered",
+      "trackingRunId": "fx-scattered-run1"
+    },
+    {
+      "id": "cld_scat_b",
+      "version": 2,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.618308,
+                42.75538
+              ],
+              [
+                -73.569302,
+                42.75538
+              ],
+              [
+                -73.569302,
+                42.791352
+              ],
+              [
+                -73.618308,
+                42.791352
+              ],
+              [
+                -73.618308,
+                42.75538
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-scattered",
+      "trackingRunId": "fx-scattered-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-scattered-e3",
+      "type": "updated",
+      "sourceCloudIds": [
+        "cld_scat_a"
+      ],
+      "targetCloudIds": [
+        "cld_scat_a"
+      ],
+      "effectiveAt": "2026-10-24T15:10:00.000Z"
+    },
+    {
+      "eventId": "fx-scattered-e4",
+      "type": "updated",
+      "sourceCloudIds": [
+        "cld_scat_b"
+      ],
+      "targetCloudIds": [
+        "cld_scat_b"
+      ],
+      "effectiveAt": "2026-10-24T15:10:00.000Z"
+    }
+  ],
+  "anchorUpdates": [
+    {
+      "messageId": "msg_scat_a1",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_scat_a",
+      "anchor": {
+        "longitude": -73.6918,
+        "latitude": 42.7284
+      },
+      "action": "move"
+    },
+    {
+      "messageId": "msg_scat_b1",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_scat_b",
+      "anchor": {
+        "longitude": -73.593805,
+        "latitude": 42.773366
+      },
+      "action": "move"
+    }
+  ]
+}

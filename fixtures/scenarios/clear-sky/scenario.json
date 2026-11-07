@@ -1,0 +1,22 @@
+{
+  "name": "clear-sky",
+  "description": "No observed clouds. UI shows Draw a cloud.",
+  "datasetId": "fx-clear",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": []
+  },
+  "expect": {
+    "activeCloudIds": []
+  }
+}
