@@ -1,5 +1,15 @@
 # Owner 3 — Tracking
 
+## Integration update after pulling main (`902219c`)
+
+Merged main into `owner-3/tracking`. Adopted Owner 4's canonical validator for offline batches, wrapped the bundled schema with an explicit TrackingBatch reference (root alone has only definitions), enabled timestamp format validation, accepted the adopted sequence-only ack, and reconciled canonical artwork control points. No contract or generated-type changes.
+
+Integration authorization also covered two small shared-tool fixes: portable generated-content check on Windows, and the mock worker-state endpoint needed to exercise the entire publishing CLI. The mock remains explicitly development-only.
+
+Verification: combined worker/shared Python suite; all shared fixtures and wind cases; actual worker batches through Node mock with duplicate acks; CLI publish and restart through that mock; shared `tools/smoke.mjs` with synthetic auth; root lint/typecheck/test/build; portable check:contracts. No real backend/DB or Clerk integration exists on pulled main.
+
+Owner 2 still needs the transactional state/hold/expiry/version semantics in the integration proposal. Owner 4 can now merge this branch and add worker publishing to CI using the mock for tooling checks. Cloud-relative anchors remain an unadopted proposal; this worker continues using canonical world anchors and local deformation, which are required under overcast.
+
 Branch: `owner-3/tracking`. Base: `b4fd1fa`.
 
 Implementation delivered in eight commits: service scaffold; wind/advection; satellite/segmentation; motion/lineage; content lifecycle; delivery/replay CLI; correctness regressions; operating guide/dependency lock and real-data smoke verification.

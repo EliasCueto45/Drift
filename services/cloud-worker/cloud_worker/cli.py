@@ -10,6 +10,7 @@ from .inputs import observation_inputs, synthetic_inputs
 from .models import Grid
 from .state import Journal
 from jsonschema.exceptions import ValidationError, SchemaError
+from .contracts import DEFAULT_SCHEMA, validate_batch
 
 
 def bind_destination(state_dir, destination):
@@ -23,11 +24,13 @@ def bind_destination(state_dir, destination):
 
 
 class JsonlSink:
-    def __init__(self, path):
+    def __init__(self, path, schema=None):
         self.path = Path(path)
+        self.schema = schema
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def send(self, batch):
+        validate_batch(batch, self.schema)
         # Offline sink supports lost-ack retry without duplicate lines.
         existing = set()
         if self.path.exists():
@@ -75,13 +78,13 @@ def main(argv=None):
             if (engine.dataset_id, engine.run_id, engine.grid) != (args.dataset, args.run_id, grid):
                 raise ValueError("state directory belongs to another dataset/run/grid")
             if args.publish:
-                if not args.batch_schema:
-                    raise ValueError("publishing requires Owner 4's canonical --batch-schema")
-                schema = json.loads(args.batch_schema.read_text(encoding="utf-8"))
+                schema = json.loads((args.batch_schema or DEFAULT_SCHEMA).read_text(encoding="utf-8"))
                 sink = ApiClient(os.environ["DRIFT_API_BASE_URL"], os.environ["TRACKING_INGEST_SECRET"], schema)
+                sink.tracking_run_id = args.run_id
                 bind_destination(args.state_dir, {"api": sink.base})
             else:
-                sink = JsonlSink(args.output)
+                schema = json.loads(args.batch_schema.read_text(encoding="utf-8")) if args.batch_schema else None
+                sink = JsonlSink(args.output, schema)
                 bind_destination(args.state_dir, {"file": str(args.output.resolve())})
             flush(journal, sink)
             inputs = observation_inputs(args.manifest, args.state_dir/"cache") if args.manifest else synthetic_inputs(fixture)

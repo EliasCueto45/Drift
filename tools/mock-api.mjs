@@ -17,6 +17,18 @@ const rank = (a, b) => b.voteCount - a.voteCount || (a.createdAt < b.createdAt ?
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x"); const p = url.pathname; const auth = req.headers.authorization ?? "";
+  if (req.method === "GET" && p === "/api/internal/tracking/state") {
+    if (auth !== `Bearer ${SECRET}`) return err(res, 401, "UNAUTHENTICATED", "bad worker secret");
+    const datasetId = url.searchParams.get("datasetId");
+    if (!datasetId) return err(res, 422, "INVALID", "datasetId required");
+    const selected = [...clouds.values()].filter((c) => c.datasetId === datasetId);
+    const ids = new Set(selected.map((c) => c.id));
+    return send(res, 200, { data: {
+      datasetId, trackingRunId: selected[0]?.trackingRunId ?? url.searchParams.get("trackingRunId") ?? "regional-v1",
+      sequence: lastSeq.get(datasetId) ?? 0, clouds: selected,
+      messages: [...messages.values()].filter((m) => ids.has(m.cloudId) && !m.expiredAt),
+    }, nextCursor: null });
+  }
   if (req.method === "POST" && p === "/api/internal/tracking/batches") {
     if (auth !== `Bearer ${SECRET}`) return err(res, 401, "UNAUTHENTICATED", "bad worker secret");
     const b = await readBody(req);

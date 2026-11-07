@@ -5,11 +5,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
-from jsonschema import Draft202012Validator
 from shapely.geometry import shape
 from shapely.ops import transform
 
 from .models import Track, Parcel, timestamp
+from .contracts import batch_validator, validate_batch
 
 
 class Conflict(RuntimeError):
@@ -31,9 +31,10 @@ class ApiClient:
             raise ValueError("invalid API configuration")
         self.base, self.secret = base_url.rstrip("/"), secret
         self.attempts, self.timeout = attempts, timeout
+        self.tracking_run_id = None
         self.opener = build_opener(NoRedirect())
-        Draft202012Validator.check_schema(schema)
-        self.validator = Draft202012Validator(schema)
+        self.schema = schema
+        self.validator = batch_validator(schema)
 
     def request(self, method, path, payload=None):
         body = json.dumps(payload, allow_nan=False, separators=(",", ":")).encode() if payload is not None else None
@@ -58,10 +59,11 @@ class ApiClient:
         raise RuntimeError("tracking API unavailable; pending batch retained for retry")
 
     def send(self, batch):
-        self.validator.validate(batch)
+        validate_batch(batch, self.schema)
         result = self.request("POST", "/api/internal/tracking/batches", batch)["data"]
-        if (result.get("batchId"), result.get("datasetId"), result.get("sequence")) != (
-                batch["batchId"], batch["datasetId"], batch["sequence"]):
+        if (result.get("sequence") != batch["sequence"]
+                or ("batchId" in result and result["batchId"] != batch["batchId"])
+                or ("datasetId" in result and result["datasetId"] != batch["datasetId"])):
             raise RuntimeError("invalid batch acknowledgement; checkpoint not advanced")
 
     def state(self, dataset_id):
@@ -69,6 +71,8 @@ class ApiClient:
         identity = None
         while True:
             query = {"datasetId": dataset_id}
+            if self.tracking_run_id:
+                query["trackingRunId"] = self.tracking_run_id
             if cursor:
                 query["cursor"] = cursor
             page = self.request("GET", "/api/internal/tracking/state?"+urlencode(query))
@@ -114,7 +118,8 @@ def synchronize(engine, state):
             continue
         key = value["id"]
         x, y = transform_geo(value["anchor"]["longitude"], value["anchor"]["latitude"])
-        controls = [transform_geo(p["longitude"], p["latitude"]) for p in value.get("artworkControlPoints", [])]
+        controls = [transform_geo(p["longitude"], p["latitude"]) for p in
+                    value.get("artworkControlPoints", (value.get("artworkTransform") or {}).get("controlPoints", []))]
         existing = engine.parcels.get(key)
         position_at = timestamp(value["positionAt"]) if value.get("positionAt") else (
             existing.position_at if existing else timestamp(value["updatedAt"]))

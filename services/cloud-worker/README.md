@@ -1,6 +1,6 @@
 # Drift cloud worker — Owner 3
 
-Wind-assisted regional cloud tracking, local message/artwork advection, lineage, lifecycle evidence, durable delivery and replay. This service is implemented independently of the absent frontend/backend. Publishing is intentionally gated on Owner 4's canonical batch schema. The backend state/ack requirements are in [the integration proposal](../../docs/decisions/owner-3-tracking-integration.md).
+Wind-assisted regional cloud tracking, local message/artwork advection, lineage, lifecycle evidence, durable delivery and replay. This service is implemented independently of the absent frontend/backend. Offline output uses Owner 4's shared Python validator; publishing uses the same canonical batch schema. The backend state/ack requirements are in [the integration proposal](../../docs/decisions/owner-3-tracking-integration.md).
 
 ## Run from a clean clone
 
@@ -62,10 +62,10 @@ The JSON adapter requires `units: m/s`, `heightUnits: m`, source and samples wit
 Copy `.env.example` to `.env` and set variables in your process environment using your normal secret-loading workflow. The worker reads environment variables; it does not automatically load dotenv files. Never use a Clerk/browser key as the ingestion secret.
 
 ```sh
-uv run --project services/cloud-worker --locked python -m cloud_worker --mode replay --dataset troy-demo --publish --batch-schema packages/contracts/tracking-batch.schema.json --state-dir services/cloud-worker/.worker-state/publish-demo
+uv run --project services/cloud-worker --locked python -m cloud_worker --mode replay --dataset troy-demo --publish --batch-schema packages/contracts/schemas/drift.schema.json --state-dir services/cloud-worker/.worker-state/publish-demo
 ```
 
-The schema path above is the proposed Owner 4 deliverable and does not exist yet. Supply the reviewed, bundled JSON Schema (self-contained `$defs`); the worker validates every outgoing batch before POST. HTTP is allowed only on loopback; all other API targets require HTTPS. Redirects are rejected to avoid forwarding bearer credentials. Retries are bounded; 401/403/422 are not retried.
+The canonical bundled schema now exists and is the default in a repository checkout. Its TrackingBatch definition is explicitly selected, including timestamp formats; passing the definitions-only root directly would not validate a batch. Standalone wheel installs must supply --batch-schema. Offline JSONL output also validates against the shared contract. The client accepts the adopted sequence-only acknowledgement and checks optional batch/dataset IDs when present. HTTP is allowed only on loopback; all other API targets require HTTPS. Redirects are rejected to avoid forwarding bearer credentials. Retries are bounded; 401/403/422 are not retried.
 
 Before every new observation, fetch all paginated active state and reconcile newly posted/deleted messages and created clouds. Stage both batch and candidate engine state in an atomic JSON journal **before** sending. A valid acknowledgement advances the checkpoint. Lost acknowledgements resend the exact same batch ID/body after restart. A 409 refreshes and recomputes once only if server sequence still equals the checkpoint. Otherwise stop and retain the journal for explicit reconciliation. No backend integration is claimed until Owners 2/4 validate this flow against their real DB and schemas.
 
@@ -85,3 +85,5 @@ Tests exercise real OpenCV translation, synthetic NetCDF geostationary navigatio
 An additional real-data smoke check loaded GOES-19 CONUS ACM masks at **2025-07-19 17:01:18.1 UTC** and **17:06:18.1 UTC**, plus that hour's first DMW product (18,782 quality-filtered vectors). All 4,096 Troy-grid cells were valid in both masks; segmentation found three then four regions and the engine emitted sequences 1 and 2. Measured processing time was approximately six seconds per 64×64 observation on the development machine. Spatial degree buckets prune full-disk winds before regional sampling. This verifies archive ingestion and pipeline execution, not identity accuracy, wind-layer correctness or real-time operation. Current live acquisition, optional real height/CMI products and real-backend smoke checks remain outstanding integration checks. Downloaded files are ignored local output, not repository fixtures.
 
 References: [NOAA ACM metadata](https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ncdc%3AC01503), [NOAA DMW algorithm](https://www.star.nesdis.noaa.gov/goesr/documents/ATBDs/Enterprise/ATBD_Enterprise_Derived_Motion_Winds_v4.2_2024_06_05.pdf), [PROJ geostationary geometry](https://proj.org/en/stable/operations/projections/geos.html), [OpenCV optical flow](https://docs.opencv.org/4.x/d4/dee/tutorial_optical_flow.html).
+
+Integration check after pulling main: the full publish CLI, restart/deduplication and shared smoke suite pass against tools/mock-api.mjs. This development mock now exposes worker state; it remains in-memory and does not establish real DB transaction correctness.

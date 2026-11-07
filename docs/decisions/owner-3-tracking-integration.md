@@ -1,5 +1,7 @@
 # Tracking integration proposal — Owners 2 and 4 review required
 
+Update after merging main at `902219c`: canonical v1 schemas and the shared Python validator now exist. The worker validates offline output with `drift_contracts.validate`, selects `$defs/TrackingBatch` for explicit schema validation, and accepts the adopted `{data:{sequence}}` acknowledgement. Batch/dataset IDs below are optional acknowledgement extensions, checked when present. Canonical artwork state uses `artworkTransform.controlPoints`; the worker accepts that shape. The remaining state/hold/geometric-time semantics below are backend implementation requirements, not adopted schema changes. The mock now exposes a development-only worker-state route for full replay CLI testing; it is not proof of transactional backend behavior.
+
 No canonical schemas or backend existed when Owner 3 began. Worker internal dataclasses are not shared API types. The worker emits README v1 field names; publishing requires a supplied canonical JSON Schema (`--batch-schema`) and remains unverified against a real backend.
 
 ## Exact state/ack shape to adopt
