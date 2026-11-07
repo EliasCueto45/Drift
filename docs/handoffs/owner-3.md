@@ -14,4 +14,6 @@ Completed wind slice: altitude/time interpolation, spatial sampling, explicit su
 
 Completed satellite slice: metadata-driven GOES BCM/DQF geostationary navigation, co-timed height/CMI inputs, DMW ingestion with explicitly estimated pressure-height conversion, and hole-preserving regional polygonization. Tests use synthetic NetCDF files, not fetched satellite observations. Uncorrected parallax remains an explicit limitation.
 
-Next: optical-flow fusion and many-to-many cloud association. Run full worker pytest before each commit.
+Completed motion slice: forward/backward quality-checked Farneback flow, uncertainty fusion (including correlated DMW), wind-predicted overlap/layer gating, graph-based many-to-many association and deterministic lineage IDs. Merge/split and actual image-translation tests included.
+
+Next: parcel transfer, clear-sky evidence, created-cloud and outage lifecycle. Run full worker pytest before each commit.
