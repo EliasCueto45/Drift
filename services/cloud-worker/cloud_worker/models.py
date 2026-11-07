@@ -111,6 +111,7 @@ class Parcel:
     y: float
     version: int = 1
     control_points: list[tuple[float, float]] = field(default_factory=list)
+    position_at: datetime | None = None
 
 
 @dataclass

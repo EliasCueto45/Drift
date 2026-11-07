@@ -16,4 +16,8 @@ Completed satellite slice: metadata-driven GOES BCM/DQF geostationary navigation
 
 Completed motion slice: forward/backward quality-checked Farneback flow, uncertainty fusion (including correlated DMW), wind-predicted overlap/layer gating, graph-based many-to-many association and deterministic lineage IDs. Merge/split and actual image-translation tests included.
 
-Next: parcel transfer, clear-sky evidence, created-cloud and outage lifecycle. Run full worker pytest before each commit.
+Completed lifecycle slice: engine emits one transfer per parcel, moves artwork control points, preserves overcast locations, handles uncertainty/out-of-region, confirms clear-sky expiry and keeps created clouds independent with explicit expiry. Outages reset consecutive-clear evidence.
+
+Integration detail for Owners 2/4: `hold` with null target preserves content as pending (hidden until reassociated) rather than deleting it when the predecessor retires. Worker checkpoints retain pending descendant IDs and geometric position times. Canonical schemas/backend must support this semantic; proposal accompanies delivery slice.
+
+Next: durable batch delivery, worker state hydration, replay/GOES CLI and fixtures. Run full worker pytest before each commit.
