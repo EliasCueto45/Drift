@@ -2,7 +2,7 @@
 
 Branch: `owner-3/tracking`. Base: `b4fd1fa`.
 
-Planned seven commits: service scaffold; wind/advection; satellite/segmentation; motion/lineage; content lifecycle; delivery/replay CLI; regression tests and operational documentation.
+Implementation delivered in eight commits: service scaffold; wind/advection; satellite/segmentation; motion/lineage; content lifecycle; delivery/replay CLI; correctness regressions; operating guide/dependency lock and real-data smoke verification.
 
 Scope: `services/cloud-worker/`, atmospheric fixtures, this handoff and tracking integration proposals. No frontend/backend implementation changes.
 
@@ -24,4 +24,12 @@ Completed delivery slice: atomic JSON checkpoint/outbox, exact lost-ack resends,
 
 Completed correctness slice (commit 7): 24 tests pass, including horizon freeze, local overcast clearing, orphan/restart/reassociation, version-conflict recomputation and loopback authenticated HTTP retry. Fixed deleted-created-cloud resurrection and checkpoint destination changes; API redirects cannot forward the worker credential.
 
-An eighth commit will contain operational docs, environment/manifest examples and reproducible dependency locking. No real backend or live NOAA input has been validated. NetCDF imports emit a NumPy binary-size runtime warning in this environment; NetCDF read/write/navigation tests pass, but record it as a deployment dependency check.
+Final slice: operational README, `.env.example`, product/wind examples, packaged replay fixture and full `uv.lock`. Updated NetCDF to 1.7.5.1.post1; the prior binary-size warning no longer occurs. Final check: `python -W error -m pytest services/cloud-worker/tests -q` (25 passed). Documented uv replay command emitted eight batches at sequence 8 without publishing. `uv build --project services/cloud-worker --out-dir services/cloud-worker/out/dist` produced source and wheel distributions, including the packaged replay fixture. `git diff --check` passed.
+
+Real NOAA archive smoke: GOES-19 ACMC on 2025-07-19 at 17:01:18.1 and 17:06:18.1 UTC, first DMWC product in hour 17 (18,782 quality-filtered vectors). Troy 64x64 region: 4,096 valid cells both times, 541 then 173 cloudy cells, three then four segmented regions, sequences 1 and 2. Added spatial wind buckets after full-disk sampling proved too slow; optimized pipeline took ~6 seconds/observation locally. This verifies archive ingestion/execution only, not tracking accuracy or present-day live acquisition. No real backend has been validated.
+
+For Owner 4: root README still describes the whole repository as documentation-only; update its status/setup when integrating all workstreams. Worker setup is executable now through `services/cloud-worker/README.md`; root pnpm/Compose commands remain planned. Adopt/review canonical schema and generated Python binding, state/ack shape, held-message lifecycle and geometric time semantics from the integration proposal before publishing.
+
+For Owner 2: implement transactional ingestion/dedupe, snapshot-consistent pagination, and state reconciliation contract; test actual DB behavior against worker batches. The worker deliberately does not implement your API or mutate frontend code.
+
+Remaining operational follow-ups: deploy/schedule manifest acquisition, validate real height/CMI/current observations, correct parallax/resolve layers if accuracy requires it, and benchmark wider regions. All eight commits remain on `owner-3/tracking`; do not merge directly into main without integration review.

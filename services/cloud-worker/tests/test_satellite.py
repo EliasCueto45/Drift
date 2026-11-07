@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from cloud_worker.models import Frame, Grid, timestamp
-from cloud_worker.satellite import segment, load_goes
+from cloud_worker.satellite import segment, load_goes, load_dmw
 
 
 def test_segmentation_preserves_hole_and_overcast_extent():
@@ -40,3 +40,24 @@ def test_goes_navigation_quality_and_acquisition_time(tmp_path):
     assert frame.cloudy[frame.valid].all()
     assert frame.height_estimated
     assert frame.grid.transformer(True).transform(0, 0) == pytest.approx((-75, 0))
+
+
+def test_dmw_quality_units_and_height_fallback(tmp_path):
+    ds = xr.Dataset({name: ("n", values) for name, values in {
+        "lon": [-73.68, -73.68], "lat": [42.73, 42.73], "wind_speed": [10., 90.],
+        "wind_direction": [270., 90.], "pressure": [800., 800.], "DQF": [0, 1]}.items()},
+        attrs={"time_coverage_start":"2026-11-07T12:00:00Z"})
+    ds.wind_speed.attrs["units"] = "m s-1"
+    ds.wind_direction.attrs["units"] = "degrees"
+    ds.pressure.attrs["units"] = "hPa"
+    path = tmp_path/"dmw.nc"
+    ds.to_netcdf(path)
+    winds = load_dmw(path)
+    assert len(winds.samples) == 1
+    assert winds.samples[0].wind.u == pytest.approx(10)
+    assert winds.samples[0].wind.correlated
+    assert 1500 < winds.samples[0].altitude_m < 2500
+    ds.wind_direction.attrs["units"] = "radians"
+    ds.to_netcdf(path)
+    with pytest.raises(ValueError, match="degrees"):
+        load_dmw(path)

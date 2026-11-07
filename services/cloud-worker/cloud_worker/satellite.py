@@ -120,6 +120,8 @@ def load_dmw(path: str | Path, min_quality=80) -> WindField:
             raise ValueError("DMW speed units must be m/s")
         if ds.pressure.attrs.get("units") not in ("hPa", "mb"):
             raise ValueError("DMW pressure units must be hPa")
+        if ds.wind_direction.attrs.get("units") not in ("degrees", "degree", "degrees_north", "degree_true"):
+            raise ValueError("DMW direction must use meteorological degrees from north")
         at = timestamp(ds.attrs["time_coverage_start"])
         arrays = [np.asarray(ds[n].values).ravel() for n in
                   ("lon", "lat", "wind_speed", "wind_direction", "pressure", "DQF")]

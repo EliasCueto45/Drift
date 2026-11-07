@@ -49,6 +49,7 @@ def observation_inputs(manifest_path, cache):
     path = Path(manifest_path)
     manifest = json.loads(path.read_text(encoding="utf-8"))
     grid = Grid(**manifest["grid"])
+    previous_at = None
     for item in manifest["observations"]:
         def product(name):
             return acquire(item[name], path.parent, cache) if item.get(name) else None
@@ -56,6 +57,9 @@ def observation_inputs(manifest_path, cache):
         frame = load_goes(mask, grid, height_path=product("height"), image_path=product("image"),
                           accepted_dqf=tuple(manifest.get("acceptedDqf", [0])),
                           assumed_height_m=manifest.get("assumedHeightM", 2000))
+        if previous_at is not None and frame.observed_at <= previous_at:
+            raise ValueError("manifest products must have strictly increasing acquisition times")
+        previous_at = frame.observed_at
         wind_path = product("wind")
         winds = load_dmw(wind_path) if item.get("windFormat") == "dmw" else WindField.from_json(wind_path) if wind_path else WindField()
         yield frame, winds

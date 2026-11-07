@@ -9,6 +9,7 @@ from .engine import Engine
 from .inputs import observation_inputs, synthetic_inputs
 from .models import Grid
 from .state import Journal
+from jsonschema.exceptions import ValidationError, SchemaError
 
 
 def bind_destination(state_dir, destination):
@@ -59,7 +60,7 @@ def main(argv=None):
             raise ValueError("live dataset cannot use a replay ID")
         if args.fixture and args.manifest:
             raise ValueError("choose fixture or manifest")
-        fixture = args.fixture or Path(__file__).resolve().parents[1]/"fixtures/troy-demo.json"
+        fixture = args.fixture or Path(__file__).resolve().parent/"fixtures/troy-demo.json"
         metadata = json.loads((args.manifest or fixture).read_text(encoding="utf-8"))
         grid = Grid(**metadata["grid"])
         initial = Engine(grid, args.dataset, args.run_id)
@@ -93,6 +94,9 @@ def main(argv=None):
                               "sequence": journal.engine().sequence, "published": args.publish}))
         finally:
             lock.unlink(missing_ok=True)
+    except (ValidationError, SchemaError):
+        print("worker stopped: batch/schema validation failed; checkpoint not advanced", file=sys.stderr)
+        return 1
     except (ValueError, KeyError, OSError, RuntimeError) as error:
         print(f"worker stopped: {error}", file=sys.stderr)
         return 1

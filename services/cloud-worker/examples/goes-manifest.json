@@ -1,0 +1,10 @@
+{
+  "description": "Replace placeholder paths with real chronological GOES products. Not runnable sample data.",
+  "grid": {"crs":"EPSG:32618","x0":580000,"y0":4710000,"cell_m":1000,"width":64,"height":64},
+  "acceptedDqf": [0],
+  "assumedHeightM": 2000,
+  "observations": [
+    {"mask":"replace/first-ACMC.nc","height":"replace/first-ACHAC.nc","image":"replace/first-CMIPC-C13.nc","wind":"winds.json","windFormat":"json"},
+    {"mask":"replace/second-ACMC.nc","height":"replace/second-ACHAC.nc","image":"replace/second-CMIPC-C13.nc","wind":"replace/second-DMWC.nc","windFormat":"dmw"}
+  ]
+}

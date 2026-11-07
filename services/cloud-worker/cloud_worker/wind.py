@@ -60,6 +60,22 @@ class WindField:
                 raise ValueError("invalid wind sample")
             if not 0 <= sample.wind.confidence <= 1 or sample.altitude_m < 0:
                 raise ValueError("invalid wind quality/height")
+        self.times = sorted({s.at for s in self.samples})
+        self.buckets = {}
+        for sample in self.samples:
+            longitude = (sample.longitude+180) % 360-180
+            self.buckets.setdefault((sample.at, math.floor(longitude), math.floor(sample.latitude)), []).append(sample)
+
+    def _nearby(self, at, lon, lat):
+        # Degree buckets prune full-disk DMW vectors before exact geodesic checks.
+        lat_radius = self.max_distance_m/110_000 + .1
+        lon_radius = min(180, lat_radius/max(.01, math.cos(math.radians(lat))))
+        samples = []
+        for x in range(math.floor(lon-lon_radius), math.floor(lon+lon_radius)+1):
+            for y in range(math.floor(lat-lat_radius), math.floor(lat+lat_radius)+1):
+                wrapped = (x+180) % 360-180
+                samples.extend(self.buckets.get((at, wrapped, y), ()))
+        return samples
 
     @classmethod
     def from_json(cls, path: str | Path):
@@ -113,13 +129,13 @@ class WindField:
                        correlated=any(s.correlated for _, s in candidates))
 
     def at(self, lon: float, lat: float, altitude: float, at: datetime) -> Wind:
-        times = sorted({s.at for s in self.samples if abs((s.at-at).total_seconds()) <= self.max_age_s})
+        times = [t for t in self.times if abs((t-at).total_seconds()) <= self.max_age_s]
         if not times:
             return Wind(altitude_m=altitude)
         before = max((t for t in times if t <= at), default=times[0])
         after = min((t for t in times if t >= at), default=times[-1])
-        a = self._spatial([s for s in self.samples if s.at == before], lon, lat, altitude)
-        b = self._spatial([s for s in self.samples if s.at == after], lon, lat, altitude)
+        a = self._spatial(self._nearby(before, lon, lat), lon, lat, altitude)
+        b = self._spatial(self._nearby(after, lon, lat), lon, lat, altitude)
         if before == after:
             age_penalty = max(0, 1 - abs((at-before).total_seconds()) / self.max_age_s)
             return replace(a, confidence=a.confidence * age_penalty)
