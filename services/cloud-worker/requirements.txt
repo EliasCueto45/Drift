@@ -1,0 +1,2 @@
+# Install the service, including its pinned test extra, from the repository root.
+-e ./services/cloud-worker[test]
