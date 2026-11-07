@@ -20,4 +20,6 @@ Completed lifecycle slice: engine emits one transfer per parcel, moves artwork c
 
 Integration detail for Owners 2/4: `hold` with null target preserves content as pending (hidden until reassociated) rather than deleting it when the predecessor retires. Worker checkpoints retain pending descendant IDs and geometric position times. Canonical schemas/backend must support this semantic; proposal accompanies delivery slice.
 
-Next: durable batch delivery, worker state hydration, replay/GOES CLI and fixtures. Run full worker pytest before each commit.
+Completed delivery slice: atomic JSON checkpoint/outbox, exact lost-ack resends, authenticated/paginated state client, version-conflict reconciliation, NOAA/local product acquisition, replay/live CLI isolation and synthetic Troy fixture. Canonical JSON Schema is mandatory before publishing. See `docs/decisions/owner-3-tracking-integration.md` for precise state/ack/hold semantics requiring Owners 2/4 review.
+
+Next: broader numerical/failure regressions, operational README/environment template and final verification. No backend exists yet; HTTP integration is not claimed.
