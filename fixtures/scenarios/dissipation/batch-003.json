@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-dissipation-b003",
+  "datasetId": "fx-dissipation",
+  "trackingRunId": "fx-dissipation-run1",
+  "sequence": 3,
+  "observedAt": "2026-10-24T15:10:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_ds",
+      "version": 3,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.716285,
+                42.710414
+              ],
+              [
+                -73.667315,
+                42.710414
+              ],
+              [
+                -73.667315,
+                42.746386
+              ],
+              [
+                -73.716285,
+                42.746386
+              ],
+              [
+                -73.716285,
+                42.710414
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.6,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-dissipation",
+      "trackingRunId": "fx-dissipation-run1"
+    }
+  ],
+  "events": [],
+  "anchorUpdates": [
+    {
+      "messageId": "msg_ds_1",
+      "expectedMessageVersion": 1,
+      "targetCloudId": null,
+      "anchor": {
+        "longitude": -73.6918,
+        "latitude": 42.7284
+      },
+      "action": "hold"
+    }
+  ]
+}

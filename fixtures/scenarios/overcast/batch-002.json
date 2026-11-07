@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-overcast-b002",
+  "datasetId": "fx-overcast",
+  "trackingRunId": "fx-overcast-run1",
+  "sequence": 2,
+  "observedAt": "2026-10-24T15:10:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_overcast",
+      "version": 2,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.924411,
+                42.53055
+              ],
+              [
+                -73.385733,
+                42.53055
+              ],
+              [
+                -73.385733,
+                42.92625
+              ],
+              [
+                -73.924411,
+                42.92625
+              ],
+              [
+                -73.924411,
+                42.53055
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-overcast",
+      "trackingRunId": "fx-overcast-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-overcast-e2",
+      "type": "updated",
+      "sourceCloudIds": [
+        "cld_overcast"
+      ],
+      "targetCloudIds": [
+        "cld_overcast"
+      ],
+      "effectiveAt": "2026-10-24T15:10:00.000Z"
+    }
+  ],
+  "anchorUpdates": [
+    {
+      "messageId": "msg_oc_w",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_overcast",
+      "anchor": {
+        "longitude": -73.740771,
+        "latitude": 42.7284
+      },
+      "action": "move"
+    },
+    {
+      "messageId": "msg_oc_e",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_overcast",
+      "anchor": {
+        "longitude": -73.495917,
+        "latitude": 42.7284
+      },
+      "action": "move"
+    }
+  ]
+}

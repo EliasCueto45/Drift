@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-split-b001",
+  "datasetId": "fx-split",
+  "trackingRunId": "fx-split-run1",
+  "sequence": 1,
+  "observedAt": "2026-10-24T15:00:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_sp_m",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.777499,
+                42.665448
+              ],
+              [
+                -73.606101,
+                42.665448
+              ],
+              [
+                -73.606101,
+                42.791352
+              ],
+              [
+                -73.777499,
+                42.791352
+              ],
+              [
+                -73.777499,
+                42.665448
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:00:00.000Z",
+      "updatedAt": "2026-10-24T15:00:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:00:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-split",
+      "trackingRunId": "fx-split-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-split-e1",
+      "type": "created",
+      "sourceCloudIds": [],
+      "targetCloudIds": [
+        "cld_sp_m"
+      ],
+      "effectiveAt": "2026-10-24T15:00:00.000Z"
+    }
+  ],
+  "anchorUpdates": []
+}

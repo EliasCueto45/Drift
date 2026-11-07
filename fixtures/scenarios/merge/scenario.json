@@ -1,0 +1,74 @@
+{
+  "name": "merge",
+  "description": "A and B merge into M; both notes transfer exactly once, predecessors retire.",
+  "datasetId": "fx-merge",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json",
+    "batch-002.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_mg_a",
+        "version": 1,
+        "cloudId": "cld_mg_a",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.728528,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "note on A",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      },
+      {
+        "id": "msg_mg_b",
+        "version": 1,
+        "cloudId": "cld_mg_b",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.655072,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "note on B",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      }
+    ]
+  },
+  "expect": {
+    "activeCloudIds": [
+      "cld_mg_m"
+    ],
+    "expiredCloudIds": [
+      "cld_mg_a",
+      "cld_mg_b"
+    ],
+    "messageCloud": {
+      "msg_mg_a": "cld_mg_m",
+      "msg_mg_b": "cld_mg_m"
+    }
+  }
+}

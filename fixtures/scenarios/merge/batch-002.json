@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-merge-b002",
+  "datasetId": "fx-merge",
+  "trackingRunId": "fx-merge-run1",
+  "sequence": 2,
+  "observedAt": "2026-10-24T15:10:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_mg_a",
+      "version": 2,
+      "kind": "observed",
+      "status": "expired",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.753013,
+                42.710414
+              ],
+              [
+                -73.704043,
+                42.710414
+              ],
+              [
+                -73.704043,
+                42.746386
+              ],
+              [
+                -73.753013,
+                42.746386
+              ],
+              [
+                -73.753013,
+                42.710414
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-merge",
+      "trackingRunId": "fx-merge-run1"
+    },
+    {
+      "id": "cld_mg_b",
+      "version": 2,
+      "kind": "observed",
+      "status": "expired",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.679557,
+                42.710414
+              ],
+              [
+                -73.630587,
+                42.710414
+              ],
+              [
+                -73.630587,
+                42.746386
+              ],
+              [
+                -73.679557,
+                42.746386
+              ],
+              [
+                -73.679557,
+                42.710414
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-merge",
+      "trackingRunId": "fx-merge-run1"
+    },
+    {
+      "id": "cld_mg_m",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.765256,
+                42.674441
+              ],
+              [
+                -73.618344,
+                42.674441
+              ],
+              [
+                -73.618344,
+                42.782359
+              ],
+              [
+                -73.765256,
+                42.782359
+              ],
+              [
+                -73.765256,
+                42.674441
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:10:00.000Z",
+      "updatedAt": "2026-10-24T15:10:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:10:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [
+        "cld_mg_a",
+        "cld_mg_b"
+      ],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-merge",
+      "trackingRunId": "fx-merge-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-merge-e3",
+      "type": "merged",
+      "sourceCloudIds": [
+        "cld_mg_a",
+        "cld_mg_b"
+      ],
+      "targetCloudIds": [
+        "cld_mg_m"
+      ],
+      "effectiveAt": "2026-10-24T15:10:00.000Z"
+    }
+  ],
+  "anchorUpdates": [
+    {
+      "messageId": "msg_mg_a",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_mg_m",
+      "anchor": {
+        "longitude": -73.722407,
+        "latitude": 42.7284
+      },
+      "action": "move"
+    },
+    {
+      "messageId": "msg_mg_b",
+      "expectedMessageVersion": 1,
+      "targetCloudId": "cld_mg_m",
+      "anchor": {
+        "longitude": -73.661193,
+        "latitude": 42.7284
+      },
+      "action": "move"
+    }
+  ]
+}

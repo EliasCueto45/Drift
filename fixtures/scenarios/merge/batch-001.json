@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-merge-b001",
+  "datasetId": "fx-merge",
+  "trackingRunId": "fx-merge-run1",
+  "sequence": 1,
+  "observedAt": "2026-10-24T15:00:00.000Z",
+  "snapshots": [
+    {
+      "id": "cld_mg_a",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.753013,
+                42.710414
+              ],
+              [
+                -73.704043,
+                42.710414
+              ],
+              [
+                -73.704043,
+                42.746386
+              ],
+              [
+                -73.753013,
+                42.746386
+              ],
+              [
+                -73.753013,
+                42.710414
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:00:00.000Z",
+      "updatedAt": "2026-10-24T15:00:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:00:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-merge",
+      "trackingRunId": "fx-merge-run1"
+    },
+    {
+      "id": "cld_mg_b",
+      "version": 1,
+      "kind": "observed",
+      "status": "active",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -73.679557,
+                42.710414
+              ],
+              [
+                -73.630587,
+                42.710414
+              ],
+              [
+                -73.630587,
+                42.746386
+              ],
+              [
+                -73.679557,
+                42.746386
+              ],
+              [
+                -73.679557,
+                42.710414
+              ]
+            ]
+          ]
+        ]
+      },
+      "observedAt": "2026-10-24T15:00:00.000Z",
+      "updatedAt": "2026-10-24T15:00:00.000Z",
+      "confidence": 0.85,
+      "wind": {
+        "uMps": 10,
+        "vMps": 0,
+        "altitudeM": 2000,
+        "source": "fixture:synthetic",
+        "validAt": "2026-10-24T15:00:00.000Z",
+        "confidence": 0.8
+      },
+      "parentIds": [],
+      "creatorId": null,
+      "expiresAt": null,
+      "datasetId": "fx-merge",
+      "trackingRunId": "fx-merge-run1"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "fx-merge-e1",
+      "type": "created",
+      "sourceCloudIds": [],
+      "targetCloudIds": [
+        "cld_mg_a"
+      ],
+      "effectiveAt": "2026-10-24T15:00:00.000Z"
+    },
+    {
+      "eventId": "fx-merge-e2",
+      "type": "created",
+      "sourceCloudIds": [],
+      "targetCloudIds": [
+        "cld_mg_b"
+      ],
+      "effectiveAt": "2026-10-24T15:00:00.000Z"
+    }
+  ],
+  "anchorUpdates": []
+}

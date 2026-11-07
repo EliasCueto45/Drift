@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "batchId": "fx-clear-b001",
+  "datasetId": "fx-clear",
+  "trackingRunId": "fx-clear-run1",
+  "sequence": 1,
+  "observedAt": "2026-10-24T15:00:00.000Z",
+  "snapshots": [],
+  "events": [],
+  "anchorUpdates": []
+}

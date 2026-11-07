@@ -1,0 +1,47 @@
+{
+  "name": "created-cloud",
+  "description": "Created cloud (creator + 24h expiry) advects with wind; never merges with observed clouds.",
+  "datasetId": "fx-created",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json",
+    "batch-002.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_cr_1",
+        "version": 1,
+        "cloudId": "cld_created",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.6918,
+          "latitude": 42.75538
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "my own cloud",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      }
+    ]
+  },
+  "expect": {
+    "activeCloudIds": [
+      "cld_created",
+      "cld_created_neighbor"
+    ]
+  }
+}

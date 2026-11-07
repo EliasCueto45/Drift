@@ -1,0 +1,17 @@
+{
+  "name": "@drift/tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixtures:gen": "node fixtures-gen.mjs",
+    "fixtures:validate": "node fixtures-validate.mjs",
+    "replay": "node replay.mjs",
+    "smoke": "node smoke.mjs",
+    "mock": "node mock-api.mjs"
+  },
+  "dependencies": {
+    "@drift/contracts": "workspace:*",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

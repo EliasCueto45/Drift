@@ -1,0 +1,21 @@
+{
+  "name": "drift",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "pnpm -r --if-present run lint",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "build": "pnpm -r --if-present run build",
+    "contracts:gen": "pnpm --filter @drift/contracts run gen",
+    "fixtures:gen": "pnpm --filter @drift/tools run fixtures:gen",
+    "fixtures:validate": "pnpm --filter @drift/tools run fixtures:validate",
+    "replay": "pnpm --filter @drift/tools run replay",
+    "smoke": "pnpm --filter @drift/tools run smoke",
+    "check:contracts": "pnpm contracts:gen && pnpm fixtures:gen && pnpm fixtures:validate && test -z \"$(git status --porcelain -- packages/contracts fixtures)\"",
+    "mock": "pnpm --filter @drift/tools run mock"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name": "overcast",
+  "description": "Broad cover; footprint shrinks on the east side but notes keep distinct anchors (no bbox rescale).",
+  "datasetId": "fx-overcast",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json",
+    "batch-002.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_oc_w",
+        "version": 1,
+        "cloudId": "cld_overcast",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.814227,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "far west note",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      },
+      {
+        "id": "msg_oc_e",
+        "version": 1,
+        "cloudId": "cld_overcast",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.569373,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "far east note",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      }
+    ]
+  },
+  "expect": {
+    "activeCloudIds": [
+      "cld_overcast"
+    ],
+    "minAnchorSeparationM": 19000
+  }
+}

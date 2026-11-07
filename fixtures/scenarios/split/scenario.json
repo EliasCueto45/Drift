@@ -1,0 +1,74 @@
+{
+  "name": "split",
+  "description": "M splits into S1 (west) and S2 (east); each note goes to exactly one child by containment.",
+  "datasetId": "fx-split",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json",
+    "batch-002.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_sp_l",
+        "version": 1,
+        "cloudId": "cld_sp_m",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.740771,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "west half note",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      },
+      {
+        "id": "msg_sp_r",
+        "version": 1,
+        "cloudId": "cld_sp_m",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.642829,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "east half note",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      }
+    ]
+  },
+  "expect": {
+    "activeCloudIds": [
+      "cld_sp_s1",
+      "cld_sp_s2"
+    ],
+    "expiredCloudIds": [
+      "cld_sp_m"
+    ],
+    "messageCloud": {
+      "msg_sp_l": "cld_sp_s1",
+      "msg_sp_r": "cld_sp_s2"
+    }
+  }
+}

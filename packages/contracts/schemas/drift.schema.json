@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://drift.local/contracts/v1/drift.schema.json",
+  "title": "Drift contract v1",
+  "description": "Single source of truth. IDs are opaque strings, times ISO 8601 UTC, geometry GeoJSON WGS84 [longitude, latitude], distances meters, velocities m/s.",
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1 },
+    "Timestamp": { "type": "string", "format": "date-time" },
+    "Longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+    "Latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+    "Anchor": {
+      "type": "object",
+      "required": ["longitude", "latitude"],
+      "additionalProperties": false,
+      "properties": {
+        "longitude": { "$ref": "#/$defs/Longitude" },
+        "latitude": { "$ref": "#/$defs/Latitude" }
+      }
+    },
+    "Position": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "prefixItems": [{ "$ref": "#/$defs/Longitude" }, { "$ref": "#/$defs/Latitude" }]
+    },
+    "LinearRing": {
+      "type": "array", "minItems": 4,
+      "items": { "$ref": "#/$defs/Position" }
+    },
+    "MultiPolygon": {
+      "type": "object",
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type": { "const": "MultiPolygon" },
+        "coordinates": {
+          "type": "array",
+          "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/LinearRing" } }
+        }
+      }
+    },
+    "Polygon": {
+      "type": "object",
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type": { "const": "Polygon" },
+        "coordinates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/LinearRing" } }
+      }
+    },
+    "User": {
+      "type": "object",
+      "required": ["id", "displayName", "avatarUrl"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id", "description": "Verified Clerk user ID" },
+        "displayName": { "type": ["string", "null"] },
+        "avatarUrl": { "type": ["string", "null"] }
+      }
+    },
+    "Wind": {
+      "type": "object",
+      "required": ["uMps", "vMps", "altitudeM", "source", "validAt", "confidence"],
+      "properties": {
+        "uMps": { "type": "number", "description": "Eastward component, m/s" },
+        "vMps": { "type": "number", "description": "Northward component, m/s" },
+        "altitudeM": { "type": "number" },
+        "source": { "type": "string" },
+        "validAt": { "$ref": "#/$defs/Timestamp" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "Cloud": {
+      "type": "object",
+      "required": ["id", "version", "kind", "status", "geometry", "observedAt", "updatedAt", "confidence", "wind", "parentIds", "creatorId", "expiresAt", "datasetId", "trackingRunId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["observed", "created"] },
+        "status": { "enum": ["active", "uncertain", "out_of_region", "expired"] },
+        "geometry": { "$ref": "#/$defs/MultiPolygon" },
+        "observedAt": { "$ref": "#/$defs/Timestamp" },
+        "updatedAt": { "$ref": "#/$defs/Timestamp" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wind": { "$ref": "#/$defs/Wind" },
+        "parentIds": { "type": "array", "items": { "$ref": "#/$defs/Id" } },
+        "creatorId": { "type": ["string", "null"] },
+        "expiresAt": { "oneOf": [{ "$ref": "#/$defs/Timestamp" }, { "type": "null" }] },
+        "datasetId": { "$ref": "#/$defs/Id" },
+        "trackingRunId": { "$ref": "#/$defs/Id" }
+      },
+      "if": { "properties": { "kind": { "const": "created" } }, "required": ["kind"] },
+      "then": {
+        "properties": { "expiresAt": { "$ref": "#/$defs/Timestamp" }, "creatorId": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "ArtworkTransform": {
+      "type": "object",
+      "required": ["widthM", "heightM", "rotationDeg"],
+      "properties": {
+        "widthM": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 },
+        "heightM": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 },
+        "rotationDeg": { "type": "number", "description": "Clockwise; anchor is the center" },
+        "controlPoints": {
+          "type": "array", "items": { "$ref": "#/$defs/Anchor" },
+          "description": "World control points persisted for advection/deformation"
+        }
+      }
+    },
+    "Message": {
+      "type": "object",
+      "required": ["id", "version", "cloudId", "authorId", "kind", "anchor", "createdAt", "updatedAt", "expiredAt", "voteCount", "viewerHasUpvoted", "body", "assetId", "songUrl", "artworkTransform"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "cloudId": { "$ref": "#/$defs/Id" },
+        "authorId": { "$ref": "#/$defs/Id" },
+        "kind": { "enum": ["text", "audio", "song", "drawing", "png"] },
+        "anchor": { "$ref": "#/$defs/Anchor" },
+        "createdAt": { "$ref": "#/$defs/Timestamp" },
+        "updatedAt": { "$ref": "#/$defs/Timestamp" },
+        "expiredAt": { "oneOf": [{ "$ref": "#/$defs/Timestamp" }, { "type": "null" }] },
+        "voteCount": { "type": "integer", "minimum": 0 },
+        "viewerHasUpvoted": { "type": "boolean" },
+        "body": { "type": ["string", "null"], "maxLength": 2000 },
+        "assetId": { "type": ["string", "null"] },
+        "songUrl": { "type": ["string", "null"], "maxLength": 2048, "pattern": "^(https://.*)?$" },
+        "artworkTransform": { "oneOf": [{ "$ref": "#/$defs/ArtworkTransform" }, { "type": "null" }] }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "text" } } }, "then": { "properties": { "body": { "type": "string", "minLength": 1 } } } },
+        { "if": { "properties": { "kind": { "const": "song" } } }, "then": { "properties": { "songUrl": { "type": "string", "minLength": 9 } } } },
+        { "if": { "properties": { "kind": { "enum": ["audio", "png", "drawing"] } } }, "then": { "properties": { "assetId": { "type": "string", "minLength": 1 } } } },
+        { "if": { "properties": { "kind": { "enum": ["png", "drawing"] } } }, "then": { "properties": { "artworkTransform": { "$ref": "#/$defs/ArtworkTransform" } } } }
+      ]
+    },
+    "Asset": {
+      "type": "object",
+      "required": ["id", "ownerId", "kind", "mimeType", "sizeBytes", "state", "createdAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "ownerId": { "$ref": "#/$defs/Id" },
+        "kind": { "enum": ["png", "audio", "drawing"] },
+        "mimeType": { "type": "string" },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "width": { "type": ["integer", "null"] },
+        "height": { "type": ["integer", "null"] },
+        "durationSec": { "type": ["number", "null"] },
+        "state": { "enum": ["pending", "ready", "deleted"] },
+        "createdAt": { "$ref": "#/$defs/Timestamp" }
+      },
+      "not": { "required": ["objectKey"] }
+    },
+    "LifecycleEvent": {
+      "type": "object",
+      "required": ["eventId", "type", "sourceCloudIds", "targetCloudIds", "effectiveAt"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/Id" },
+        "type": { "enum": ["created", "updated", "merged", "split", "uncertain", "out_of_region", "dissipated"] },
+        "sourceCloudIds": { "type": "array", "items": { "$ref": "#/$defs/Id" } },
+        "targetCloudIds": { "type": "array", "items": { "$ref": "#/$defs/Id" } },
+        "effectiveAt": { "$ref": "#/$defs/Timestamp" }
+      }
+    },
+    "AnchorUpdate": {
+      "type": "object",
+      "required": ["messageId", "expectedMessageVersion", "targetCloudId", "anchor", "action"],
+      "properties": {
+        "messageId": { "$ref": "#/$defs/Id" },
+        "expectedMessageVersion": { "type": "integer", "minimum": 1 },
+        "targetCloudId": { "type": ["string", "null"] },
+        "anchor": { "$ref": "#/$defs/Anchor" },
+        "artworkControlPoints": { "type": "array", "items": { "$ref": "#/$defs/Anchor" } },
+        "action": { "enum": ["move", "hold", "expire"] }
+      },
+      "if": { "properties": { "action": { "const": "move" } } },
+      "then": { "properties": { "targetCloudId": { "type": "string", "minLength": 1 } } }
+    },
+    "TrackingBatch": {
+      "type": "object",
+      "required": ["schemaVersion", "batchId", "datasetId", "trackingRunId", "sequence", "observedAt", "snapshots", "events", "anchorUpdates"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "batchId": { "$ref": "#/$defs/Id" },
+        "datasetId": { "$ref": "#/$defs/Id" },
+        "trackingRunId": { "$ref": "#/$defs/Id" },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "observedAt": { "$ref": "#/$defs/Timestamp" },
+        "snapshots": { "type": "array", "items": { "$ref": "#/$defs/Cloud" } },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/LifecycleEvent" } },
+        "anchorUpdates": { "type": "array", "items": { "$ref": "#/$defs/AnchorUpdate" } }
+      }
+    },
+    "ApiError": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "required": ["code", "message", "requestId"],
+          "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "requestId": { "type": "string" } }
+        }
+      }
+    },
+    "CloudWithPreviews": {
+      "type": "object",
+      "required": ["cloud", "previews"],
+      "properties": {
+        "cloud": { "$ref": "#/$defs/Cloud" },
+        "previews": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/Message" } }
+      }
+    },
+    "SkyResponse": {
+      "type": "object",
+      "required": ["data"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "required": ["clouds", "asOf", "freshness"],
+          "properties": {
+            "clouds": { "type": "array", "items": { "$ref": "#/$defs/CloudWithPreviews" } },
+            "asOf": { "$ref": "#/$defs/Timestamp" },
+            "weather": { "type": ["object", "null"] },
+            "freshness": { "enum": ["live", "estimated", "stale", "replay"] }
+          }
+        },
+        "nextCursor": { "type": ["string", "null"] }
+      }
+    },
+    "MessagesResponse": {
+      "type": "object",
+      "required": ["data"],
+      "properties": {
+        "data": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/Message" } },
+        "nextCursor": { "type": ["string", "null"] }
+      }
+    },
+    "CreateMessageRequest": {
+      "type": "object",
+      "required": ["kind", "anchor", "expectedCloudVersion"],
+      "properties": {
+        "kind": { "enum": ["text", "audio", "song", "drawing", "png"] },
+        "anchor": { "$ref": "#/$defs/Anchor" },
+        "expectedCloudVersion": { "type": "integer", "minimum": 1 },
+        "body": { "type": "string", "maxLength": 2000 },
+        "assetId": { "type": "string" },
+        "songUrl": { "type": "string", "maxLength": 2048, "pattern": "^https://" },
+        "artworkTransform": { "$ref": "#/$defs/ArtworkTransform" },
+        "strokes": { "type": "array", "maxItems": 10000 }
+      },
+      "not": { "required": ["authorId"] }
+    },
+    "CreateCloudRequest": {
+      "type": "object",
+      "required": ["outline", "assumedAltitudeM"],
+      "properties": {
+        "outline": { "$ref": "#/$defs/Polygon" },
+        "assumedAltitudeM": { "const": 2000 }
+      },
+      "not": { "anyOf": [{ "required": ["creatorId"] }, { "required": ["expiresAt"] }] }
+    }
+  }
+}

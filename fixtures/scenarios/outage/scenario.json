@@ -1,0 +1,49 @@
+{
+  "name": "outage",
+  "description": "Data gap > 30 min: cloud goes uncertain, content is held, nothing is deleted.",
+  "datasetId": "fx-outage",
+  "synthetic": true,
+  "batches": [
+    "batch-001.json",
+    "batch-002.json"
+  ],
+  "seed": {
+    "users": [
+      {
+        "id": "user_fixture_alice",
+        "displayName": "Alice (fixture)",
+        "avatarUrl": null
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_out_1",
+        "version": 1,
+        "cloudId": "cld_out",
+        "authorId": "user_fixture_alice",
+        "kind": "text",
+        "anchor": {
+          "longitude": -73.6918,
+          "latitude": 42.7284
+        },
+        "createdAt": "2026-10-24T14:55:00.000Z",
+        "updatedAt": "2026-10-24T14:55:00.000Z",
+        "expiredAt": null,
+        "voteCount": 0,
+        "viewerHasUpvoted": false,
+        "body": "survives the outage",
+        "assetId": null,
+        "songUrl": null,
+        "artworkTransform": null
+      }
+    ]
+  },
+  "expect": {
+    "uncertainCloudIds": [
+      "cld_out"
+    ],
+    "notExpiredMessageIds": [
+      "msg_out_1"
+    ]
+  }
+}
