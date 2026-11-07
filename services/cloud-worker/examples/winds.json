@@ -1,0 +1,12 @@
+{
+  "source": "SYNTHETIC EXAMPLE: replace with normalized altitude-aware provider data",
+  "units": "m/s",
+  "heightUnits": "m",
+  "correlatedWithImagery": false,
+  "samples": [
+    {"longitude":-73.68,"latitude":42.73,"altitudeM":1000,"validAt":"2026-11-07T12:00:00Z","confidence":0.7,"speedMps":8,"directionFromDeg":270},
+    {"longitude":-73.68,"latitude":42.73,"altitudeM":3000,"validAt":"2026-11-07T12:00:00Z","confidence":0.7,"uMps":12,"vMps":2},
+    {"longitude":-73.68,"latitude":42.73,"altitudeM":1000,"validAt":"2026-11-07T13:00:00Z","confidence":0.7,"uMps":10,"vMps":0},
+    {"longitude":-73.68,"latitude":42.73,"altitudeM":3000,"validAt":"2026-11-07T13:00:00Z","confidence":0.7,"uMps":14,"vMps":2}
+  ]
+}

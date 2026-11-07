@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "description": "Synthetic Troy-region lifecycle exercise; not historical satellite imagery.",
+  "grid": {"crs":"EPSG:32618","x0":600000,"y0":4720000,"cell_m":1000,"width":32,"height":32},
+  "frames": [
+    {"at":"2026-11-07T12:00:00Z","rectangles":[[4,4,10,12],[14,4,20,12]]},
+    {"at":"2026-11-07T12:05:00Z","rectangles":[[4,4,20,12]]},
+    {"at":"2026-11-07T12:10:00Z","rectangles":[[4,4,10,12],[14,4,20,12]]},
+    {"at":"2026-11-07T12:15:00Z","rectangles":[[0,0,32,32]]},
+    {"at":"2026-11-07T12:20:00Z","outage":true},
+    {"at":"2026-11-07T12:25:00Z"},
+    {"at":"2026-11-07T12:30:00Z"},
+    {"at":"2026-11-07T12:35:00Z"}
+  ]
+}

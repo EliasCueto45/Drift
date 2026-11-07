@@ -15,7 +15,7 @@
     "fixtures:validate": "pnpm --filter @drift/tools run fixtures:validate",
     "replay": "pnpm --filter @drift/tools run replay",
     "smoke": "pnpm --filter @drift/tools run smoke",
-    "check:contracts": "pnpm contracts:gen && pnpm fixtures:gen && pnpm fixtures:validate && test -z \"$(git status --porcelain -- packages/contracts fixtures)\"",
+    "check:contracts": "pnpm contracts:gen && pnpm fixtures:gen && pnpm fixtures:validate && node tools/check-generated.mjs",
     "mock": "pnpm --filter @drift/tools run mock"
   }
 }
