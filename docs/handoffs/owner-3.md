@@ -12,4 +12,6 @@ Completed: isolated Python package scaffold, pinned direct dependencies, interna
 
 Completed wind slice: altitude/time interpolation, spatial sampling, explicit surface/stale fallback confidence, meteorological direction conversion, and geodesic transport in <=60-second substeps. Checks: worker pytest suite (5 passed).
 
-Next: geostationary satellite input, quality masking and segmentation.
+Completed satellite slice: metadata-driven GOES BCM/DQF geostationary navigation, co-timed height/CMI inputs, DMW ingestion with explicitly estimated pressure-height conversion, and hole-preserving regional polygonization. Tests use synthetic NetCDF files, not fetched satellite observations. Uncorrected parallax remains an explicit limitation.
+
+Next: optical-flow fusion and many-to-many cloud association. Run full worker pytest before each commit.
