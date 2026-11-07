@@ -1,5 +1,7 @@
 # Owner 3 — Tracking
 
+CI correction: the Python job invokes the shared Node smoke suite, so it now explicitly provisions Node 22/pnpm and installs the frozen workspace dependencies. The previous isolated runner failed with `ERR_MODULE_NOT_FOUND: ajv`; local node_modules had masked this setup omission. Integration tests remain enabled.
+
 ## Integration update after pulling main (`902219c`)
 
 Merged main into `owner-3/tracking`. Adopted Owner 4's canonical validator for offline batches, wrapped the bundled schema with an explicit TrackingBatch reference (root alone has only definitions), enabled timestamp format validation, accepted the adopted sequence-only ack, and reconciled canonical artwork control points. No contract or generated-type changes.
