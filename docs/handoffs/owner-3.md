@@ -10,4 +10,6 @@ Shared schemas and backend endpoints are absent. Internal dataclasses represent 
 
 Completed: isolated Python package scaffold, pinned direct dependencies, internal frame/grid/track/parcel types and timestamp/evidence validation tests.
 
-Next: altitude-aware wind interpolation and geodesic advection.
+Completed wind slice: altitude/time interpolation, spatial sampling, explicit surface/stale fallback confidence, meteorological direction conversion, and geodesic transport in <=60-second substeps. Checks: worker pytest suite (5 passed).
+
+Next: geostationary satellite input, quality masking and segmentation.
