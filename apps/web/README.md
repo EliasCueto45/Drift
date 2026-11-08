@@ -34,3 +34,9 @@ npm run typecheck && npm run lint && npm test && npm run contracts:check
 - `src/features/sky/` — `projection.ts` (the single `SkyProjection`, geo <-> screen both ways), `geo.ts` (WGS84/ECEF/ENU), `orientation.ts` + `sensors.ts` (camera pose, permissions), `scene.ts` (per-frame scene, hit testing), `render.ts` (vapor lettering, synthetic clouds), `SkyStage.tsx` (camera/simulated canvas), `MapStage.tsx` (2D fallback), `CloudPanel.tsx`, `CloudSheet.tsx`, `DriftApp.tsx` (flow).
 - `src/features/composer/` — `Composer.tsx`, `PostItem.tsx`, `posts.tsx` (votes, local posts).
 - `src/lib/` — API client, contract types, Clerk/dev auth bridge.
+
+## Connected cloud and post flows
+
+Draw a cloud opens a geographic outline editor from camera, simulated or map views. Tap outline points or pan with arrow keys and add a point at the crosshair; publishing closes the ring and validates it on the API. It targets the dataset currently displayed. Created-cloud deletion and post deletion show confirmation and are available to the current creator/author; the server enforces ownership.
+
+The composer retains its request/key when a response is lost, including the original cloud version. Editing or receiving a definite rejection starts a new attempt. The API keeps transactional receipts for 24 hours without copying post bodies. Posts show public author names with a neutral fallback for older profiles. Polling revalidates local posts and loaded rows, preserving moved anchors and removing held/expired/deleted entries; the shared 50 km discovery policy remains in effect. Account changes clear local post/vote state. Read `docs/decisions/0004-connected-cloud-post-flows.md` for the additive contract fields and retry semantics.
