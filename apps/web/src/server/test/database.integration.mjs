@@ -213,6 +213,15 @@ test('MongoDB replica-set persistence and backend integration',async t=>{
         assert.equal(await collection(context,'messages').countDocuments({cloud_id:cloud.id,expired_at:null}),1);
       }else{assert.equal(post.reason.status,410);assert.equal((await get(context,'clouds',cloud.id)).payload.status,'expired');}
     });
+    await t.test('ranking snapshots exceed one BSON document safely and reject expired cursors immediately',async()=>{
+      await run(async db=>{
+        const first=await snapshotPage(db,'large-snapshot',null,async()=>({items:Array(18).fill('x'.repeat(1024*1024))}),2);
+        assert.equal(first.items.length,2);assert.ok(first.nextCursor);
+        assert.equal((await snapshotPage(db,'large-snapshot',first.nextCursor,()=>{throw new Error('Must use frozen snapshot');},2)).items.length,2);
+        db.now=new Date(db.now.getTime()+300001);
+        await assert.rejects(snapshotPage(db,'large-snapshot',first.nextCursor,()=>({items:[]}),2),{code:'CURSOR_EXPIRED'});
+      });
+    });
     await t.test('created cloud geometry, ownership, expiry and cleanup',async()=>{
       process.env.DRIFT_DATASET_ID='fx-clear';
       const ds=await get(context,'datasets','fx-clear');
