@@ -1,111 +1,70 @@
-# Drift backend setup
+# MongoDB Atlas and Python API setup
 
-The backend uses MongoDB Atlas (or another transaction-capable MongoDB replica set), Clerk sessions, and private S3-compatible media. Public API contracts and tracking payloads remain v1. Remaining team integration work is tracked in `docs/handoffs/owner-2.md`.
+Use Python 3.12 and the root `requirements.lock.txt`. Install the root project and tracking worker as editable packages following the root README. No Node/pnpm installation is required. Canonical HTTP payloads and the existing MongoDB collection format remain compatible with the previous backend; this port requires no data export or reset.
 
-## Local environment
+## Private configuration
 
-- `apps/web/.env.local`: `MONGODB_URI`, `MONGODB_DB`, Clerk keys, and media settings.
-- Root `.env`: `TRACKING_INGEST_SECRET`, `DRIFT_API_BASE_URL`, `DRIFT_DATASET_ID`, and optional `SMOKE_AUTH_TOKEN`.
-- Both filenames are ignored by Git. `db/.env.example` contains placeholders only.
-- Backend CLI processes load both files automatically. Explicit process variables take precedence. Restart the process after changing a key.
-- The database URI contains the database user's credentials; separate MongoDB username/password variables are unnecessary. `DATABASE_URL` and the PostgreSQL driver are no longer used.
-- Clerk uses the publishable and secret keys from its dashboard. Signed-in flows require a real Clerk session.
+Keep shared settings in the ignored root `.env` and server settings in the ignored `apps/web/.env.local`. The latter overrides file defaults; explicitly exported process variables override both files. Existing local keys are accepted. Examples in `.env.example` and `db/.env.example` contain placeholders only.
 
-Next.js reads env files from its app root, so web credentials belong in `apps/web/.env.local`, outside `src/`. The backend's `environment.mjs` also loads the shared root file for CLI/worker settings.
+- `MONGODB_URI`: Atlas Drivers connection string, with a database user/password URL-encoded. `MONGODB_DB` defaults to `drift`. Atlas database users and network access must allow the machine running the API; no Atlas management API key is needed for normal database connections.
+- `CLERK_PUBLISHABLE_KEY` (or the existing `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) and full `CLERK_SECRET_KEY`: from the same Clerk application. The API uses JWKS/RS256 session verification and retrieves only public profile fields. `DRIFT_APP_ORIGIN` is the browser origin, without a trailing slash.
+- `TRACKING_INGEST_SECRET`: the same private worker bearer secret on API and worker. It cannot authenticate public user mutations.
+- `DRIFT_DATASET_ID`: target dataset for user-created clouds. Keep replay and live IDs/runs separate. Worker also uses `DRIFT_API_BASE_URL`.
+- `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and optional `S3_ENDPOINT`: private S3-compatible storage. Atlas stores metadata, not uploaded media bytes. Grant only the required private bucket object permissions and configure browser PUT CORS for the frontend origin. Use MinIO locally if desired; provision a private bucket before testing uploads.
 
-## Install, initialize, and run
+## Commands from the repository root
 
-Use Node 24 and run from the repository root:
+### Connecting from Atlas's Python dialog
+
+1. In Atlas choose **Connect → Drivers/Client Library → Python → PyMongo (Synchronous)**. This matches the backend's synchronous PyMongo client; FastAPI runs database work in its thread pool. Leave network compression unchecked unless its optional dependencies are deliberately installed; keep the legacy URI toggle off.
+2. Under **Database Access**, give the database user `readWrite` access to the `drift` database. Under **Network Access**, allow your current public IP, and later the deployed API/worker host as required. The browser never connects directly to Atlas.
+3. Copy the SRV connection string to ignored `apps/web/.env.local` as `MONGODB_URI`, replacing `<db_password>` locally with the database user's URL-encoded password. Set `MONGODB_DB=drift`. Existing credentials and URI continue working across the JavaScript-to-Python port; no new cluster, account, database, or Atlas management API key is required.
+
+```dotenv
+MONGODB_URI="mongodb+srv://DATABASE_USER:URL_ENCODED_PASSWORD@YOUR_CLUSTER.mongodb.net/?retryWrites=true&w=majority&appName=Drift"
+MONGODB_DB=drift
+```
+
+The application reads these variables in `drift_api/config.py`, creates the PyMongo pool in `drift_api/database.py`, and selects the named database explicitly. Do not paste credentials into Python source or commit a real env file. Standalone `MONGODB_USERNAME`/`MONGODB_PASSWORD` variables are unnecessary when the URI contains them. After installation, run `db-check` then `smoke-atlas` below; a successful check means the connection is already configured.
 
 ```sh
-pnpm install --frozen-lockfile
-npm ci --prefix apps/web/src/server
-npm --prefix apps/web/src/server run config:check
-npm --prefix apps/web/src/server run clerk:check
-node db/check.mjs
-node db/prepare.mjs
-npm --prefix apps/web/src/server start
+python -m drift_api.cli config-check
+python -m drift_api.cli clerk-check
+python -m drift_api.cli db-check
+python -m drift_api.cli smoke-atlas
+python -m drift_api.cli migrate
+python -m drift_api.cli prepare
+python -m drift_api.cli serve
 ```
 
-`config:check` prints presence/format booleans, never credential values. `clerk:check` verifies that Clerk accepts the secret, both keys identify the same application, and forged sessions are rejected; it does not create users or log key material. `db/check.mjs` initializes collections/indexes, pings MongoDB, and verifies a transaction. `db/prepare.mjs` idempotently seeds the eight synthetic fixture datasets and provisions a configured `*-demo` replay dataset at sequence zero if absent. It never resets existing sequences/data or auto-creates a live dataset.
-
-The standalone API binds to `http://localhost:3000` and serves the same paths as the Next route adapter. It verifies real Clerk cookie/bearer sessions; there is no production synthetic-identity bypass. Set `PORT` to change the port, `DRIFT_API_ORIGIN` for the canonical API URL, and `DRIFT_APP_ORIGIN` for the Clerk authorized party when needed. Browser mutations are restricted to the same origin. A frontend served elsewhere should use the Next API adapter/proxy on its own origin.
-
-Example synthetic read:
-
-```text
-http://localhost:3000/api/v1/sky?lat=42.7284&lng=-73.6918&radiusM=50000&datasetId=fx-scattered
-```
-
-Run a real database/HTTP readiness check after seeding:
+Config checks report presence only. Clerk check performs read-only calls and verifies the secret/public keys identify the same application; it does not sign in a real browser user. Database check verifies connectivity, indexes and transactions. Migrate creates missing collections/indexes idempotently. Prepare seeds the eight explicitly synthetic `fx-*` scenarios only when absent and provisions an empty `*-demo` replay dataset at sequence zero without resetting existing sequences. Live datasets are never auto-provisioned.
 
 ```sh
-npm --prefix apps/web/src/server run smoke:atlas
+python -m drift_api.cli provision troy-live live regional-v1 1970-01-01T00:00:00Z
+python -m drift_api.cli cleanup
+python -m drift_api.cli cleanup --watch
 ```
 
-This check uses the actual configured Atlas database and real anonymous/worker authentication boundaries, without creating real-user messages. It explicitly does not exercise Clerk sign-in or the media service.
+Provision is insert-only: an existing dataset produces an error rather than resetting its clock. Its explicit initial UTC timestamp may be epoch for a new run, before the first actual observation. Configure the worker with exactly the same dataset/run/secret and publish through `/api/internal/tracking/batches`. The cleanup watcher runs every five minutes and responds to termination signals; deploy it as a supervised process or use a scheduler for one-shot runs.
 
-## Datasets and tracking
+## Local database and verification
 
-Provision a fresh worker run explicitly, using a UTC start no later than its first observation:
+Transactions require a replica set. Atlas already supplies one. For a local alternative:
 
 ```sh
-node db/provision.mjs troy-live live regional-v1 1970-01-01T00:00:00.000Z
+docker compose up -d db
+python -m drift_tools.init_mongo
 ```
 
-Duplicate provisioning fails rather than resetting a checkpoint. Keep `troy-live`, synthetic `fx-*`, and `*-demo` replay datasets/clocks/journals separate. Set `DRIFT_DATASET_ID` to the intended dataset and use the same worker secret at both services. Worker publishing retains the canonical `/api/internal/tracking/state` and `/api/internal/tracking/batches` paths.
+Set local `MONGODB_URI=mongodb://127.0.0.1:27017/?directConnection=true` when running the API on the host. The optional Compose database is bound to loopback and uses its own MongoDB volume; it does not reuse the earlier PostgreSQL volume. The convenience initializer refuses remote/Atlas URIs.
 
-A dedicated `transaction_guards` document serializes competing MongoDB sessions before any reads/writes. MongoDB retries conflicting transaction callbacks, preserving post/retirement, vote/deletion and tracking-version invariants. Duplicate batch IDs return their original committed acknowledgement. Holds retain parcels/media/votes, hide content publicly, and preserve the worker's geometric horizon.
-
-This global guard favors correctness for the hackathon and limits throughput. Media reads/writes/deletes inside retried callbacks use deterministic object keys and idempotent S3 operations; long object operations can hold a transaction open. Move media to reserved/outbox operations and narrow guards after measuring production contention.
-
-## Storage and cleanup
-
-Create a private S3-compatible bucket and configure upload CORS. Upload URLs expire in five minutes. Completion verifies actual PNG/audio bytes, decoded dimensions/duration and size limits. PNGs are re-encoded without metadata. Verified playback objects use separate keys from upload staging, so a valid upload URL cannot overwrite ready media. Playback URLs last at most one minute and recheck message/cloud lifecycle.
-
-One cleanup pass:
+Backend tests never use `MONGODB_URI`. Set `DRIFT_TEST_MONGODB_URI` to a disposable replica set, or provide a local `mongod` via PATH/`MONGOD_BINARY`. Tests create and remove unique `drift_test_*` databases. The old locally cached official MongoDB test binary remains usable without Node installed. The explicit test harness injects synthetic users; production has no auth bypass.
 
 ```sh
-npm --prefix apps/web/src/server run cleanup
+python -W error -m pytest
+# Set DRIFT_TEST_BACKEND=1 before running this suite:
+python -W error -m pytest services/cloud-worker/tests
+python -m drift_tools.cli smoke
 ```
 
-A continuously running five-minute cleanup loop:
-
-```sh
-npm --prefix apps/web/src/server run cleanup:watch
-```
-
-Alternatively schedule the one-shot command externally at least every five minutes. Each pass handles up to 100 expiry/cleanup records. Monitor failures/backlog and increase throughput before tasks approach 24 hours. Object deletion retries are idempotent; failures leave content unavailable and retain the task. Successful deletion removes message payloads, drawing strokes and votes. Expired staging objects and abandoned assets are cleaned separately.
-
-Content visibility uses the dataset clock and explicit expiry, not MongoDB TTL timing. TTL indexes apply only to cursor/rate metadata. Historical replay content must not be purged by a wall-clock TTL. Record the actual Atlas/object-store backup retention and noncurrent-object lifecycle before deployment.
-
-## Verification
-
-```sh
-npm --prefix apps/web/src/server run lint
-npm --prefix apps/web/src/server run typecheck
-npm --prefix apps/web/src/server test
-pnpm check:contracts
-pnpm lint
-pnpm typecheck
-pnpm test
-```
-
-The backend suite starts disposable actual MongoDB replica sets and exercises transactions, unique/2dsphere indexes, concurrent sessions, all fixture scenarios, frozen/chunked pagination, geometry, expiry, media validation and shared HTTP smoke. The first run downloads an official MongoDB binary into the ignored dependency cache. Synthetic identities and object transports appear only in tests; the decoders and database operations are real.
-
-The shared dissipation generator still emits stale expected message versions in batches 3/4. Tests verify rejection, then emulate worker refresh/recomputation. Owner 4 must fix the generator to emit versions 2/3; do not weaken version checks or hand-edit generated fixtures.
-
-Lint checks JavaScript syntax. Typecheck covers the TypeScript Next adapter/middleware boundary, not every JavaScript implementation detail. Root workspace commands still skip this nested npm package until Owner 4 consolidates the web workspace. Root build success is not evidence of a complete Next app build.
-
-Owner 3's Python tests can launch `apps/web/src/server/test/backend-harness.mjs` for a disposable MongoDB-backed API. It accepts the existing `TEST_DATASET`, `TEST_MODE`, `TEST_RUN`, and `TRACKING_INGEST_SECRET` test environment variables and writes the ready `{base}` JSON to stdout. Its synthetic identity is confined to this test entry point. Adapt the worker's old embedded-PostGIS harness to this path.
-
-## Interface details and remaining limits
-
-- GeoJSON uses `[longitude,latitude]`; anchors stay geographic, including under overcast. MongoDB message queries use `2dsphere`/spherical radius filtering before vote ranking. Regional cloud discovery currently scans the selected dataset's footprints and computes geodesic distance to their boundary; it does not approximate broad cover by centroid distance. Optimize candidate selection before wider regions.
-- Drawing/artwork control points are computed geodesically and transported by the worker. The frontend clips rendering to the footprint.
-- Rank/state snapshots store individual items in bounded BSON documents, retain a frozen ordering/sequence, bind cursors to the query/viewer, and expire after five minutes. Reads filter current lifecycle/assignment; deleted/transferred content can produce short or empty pages with a continuation cursor.
-- Repeating the same desired vote state is idempotent and consumes no extra change allowance. Votes do not advance geometric message versions.
-- Supporting reads `GET /api/v1/assets/:id/url` and `GET /api/v1/messages/:id/artwork` need shared response-schema adoption. Drawing strokes currently use normalized `[x,y]` polyline arrays with at most 10,000 total points.
-- Canonical creation requests still lack the caller's selected/manual location, so a 50 km creation-distance check remains a shared-contract task. Footprint containment, outline validity/diameter and read radii are enforced.
-
-The Next host, client Clerk provider/screens, real signed-in two-browser acceptance, media provider/CORS, worker deployment, shared CI, and full live browser acceptance still need integration.
+Smoke operates on seeded synthetic datasets and advances their replay sequences. Run it against a disposable test stack for repeatable checks, not a live dataset. Without `SMOKE_AUTH_TOKEN`, real-user post/vote checks report SKIP. Production acceptance still needs two real Clerk browser sessions and actual private storage upload, completion, playback and deletion tests. Establish hosting, scheduled cleanup monitoring and real backup/noncurrent-object retention before release.
