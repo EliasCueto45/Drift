@@ -2,13 +2,14 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from "react";
 import type { Anchor, CloudWithPreviews, Freshness, Message } from "@/lib/contracts";
 import { usePosts } from "@/features/composer/posts";
-import { DEG, multiPolygonContains } from "./geo";
+import { DEG } from "./geo";
 import { visibleHfovDeg } from "./orientation";
 import type { CameraPose } from "./projection";
-import { cloudPuffs, drawFootprintGlow, drawPuffs, drawSimulatedSky, drawVaporText, layoutPosts, setVaporFont, skyExcerpt, vaporFont, type PlacedPost } from "./render";
+import { drawFootprintGlow, drawSimulatedSky, drawVaporText, layoutPosts, setVaporFont, skyExcerpt, vaporFont, type PlacedPost } from "./render";
 import { acceptShift, bestShift, correctionFromShift, frameUsable, rasterize, segmentFrame, type RegistrationState } from "./registration";
 import { TAP_TOLERANCE_PX, anchorOnCloud, buildScene, nearestOffscreen, pickCloud, type SceneCloud } from "./scene";
 import type { SkyProjection } from "./projection";
+import { drawVirtualClouds, layoutVirtualClouds } from "./virtualClouds";
 import { useLatest } from "@/lib/useLatest";
 import styles from "./sky.module.css";
 
@@ -64,9 +65,15 @@ interface Props {
   onRegister?: (r: RegistrationReport) => void;
   /** Draw the cloud mask thumbnail (debug). */
   debug?: boolean;
+  /**
+   * Camera mode when real clouds can't be seen (night, indoors): draw photo cut-out clouds at
+   * the tracked footprints, tinted for day or night, and stop camera cloud matching.
+   */
+  virtualClouds?: "off" | "day" | "night";
 }
 
 const SETTLE_MS = 600;
+const VIRTUAL_FADE_MS = 600;
 
 const AIM_DWELL_MS = 450;
 const REGISTER_EVERY_MS = 333;
@@ -128,6 +135,10 @@ export function SkyStage(props: Props) {
     const grabCtx = grab.getContext("2d", { willReadFrequently: true });
     const thumb = document.createElement("canvas");
     const thumbCtx = thumb.getContext("2d");
+    let fade = 0;
+    let fadeTint: "day" | "night" = "day";
+    let lastFrameAt = 0;
+
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -144,9 +155,13 @@ export function SkyStage(props: Props) {
       const scene = buildScene(p.clouds, pose, { width, height }, p.freshness, extra);
       sceneRef.current = scene;
 
-      if (p.mode === "camera" && video && stream && grabCtx && p.onRegister && now - lastRegister > REGISTER_EVERY_MS) {
+      const virtual = p.mode === "camera" ? (p.virtualClouds ?? "off") : "off";
+      const matching = virtual === "off" && Boolean(p.onRegister);
+      let pixels: Uint8ClampedArray | null = null;
+      let t0 = 0;
+      if (p.mode === "camera" && video && stream && grabCtx && matching && now - lastRegister > REGISTER_EVERY_MS) {
         lastRegister = now;
-        const t0 = performance.now();
+        t0 = performance.now();
         // Same crop as the object-fit: cover video, downscaled.
         const mw = MASK_W;
         const mh = Math.round((MASK_W * height) / width);
@@ -158,9 +173,14 @@ export function SkyStage(props: Props) {
           grab.height = mh;
         }
         grabCtx.drawImage(video, (stream.width - sw) / 2, (stream.height - sh) / 2, sw, sh, 0, 0, mw, mh);
+        pixels = grabCtx.getImageData(0, 0, mw, mh).data;
+      }
+      if (matching && p.onRegister && pixels) {
+        const mw = grab.width;
+        const mh = grab.height;
         const k = width / mw;
         const proj = scene.projection;
-        const mask = segmentFrame(grabCtx.getImageData(0, 0, mw, mh).data, mw, mh, (x, y) => proj.rayAt((x + 0.5) * k, (y + 0.5) * k)[2] > MIN_SKY_ELEVATION_SIN);
+        const mask = segmentFrame(pixels, mw, mh, (x, y) => proj.rayAt((x + 0.5) * k, (y + 0.5) * k)[2] > MIN_SKY_ELEVATION_SIN);
         const rings = scene.clouds.flatMap((c) => c.rings.map((r) => r.map((pt) => ({ x: pt.x / k, y: pt.y / k }))));
         const model = rasterize(rings, mw, mh);
         const unusable = frameUsable(mask);
@@ -196,22 +216,19 @@ export function SkyStage(props: Props) {
         }
       }
 
+      // Virtual clouds fade in and out as real clouds stop or start being visible.
+      const dt = lastFrameAt ? now - lastFrameAt : 0;
+      lastFrameAt = now;
+      if (virtual !== "off") fadeTint = virtual;
+      const target = virtual !== "off" ? 1 : 0;
+      fade = reducedMotion.matches ? target : target > fade ? Math.min(target, fade + dt / VIRTUAL_FADE_MS) : Math.max(target, fade - dt / VIRTUAL_FADE_MS);
+
       if (p.mode === "simulated") {
         const horizonY = height / 2 + scene.projection.focalPx * Math.tan(pose.elevationDeg * DEG);
         drawSimulatedSky(ctx, width, height, horizonY);
-        const puffs: { x: number; y: number; r: number; d: number }[] = [];
-        for (const c of scene.clouds) {
-          const geo = c.item.cloud.geometry.coordinates as number[][][][];
-          const anchors = c.posts.map((post) => post.message.anchor);
-          for (const puff of cloudPuffs(c.id, c.item.cloud.version, geo, (pt) => multiPolygonContains(geo, pt), anchors)) {
-            const s = scene.projection.projectUnclipped(puff.anchor, c.heightM + puff.liftM);
-            if (!s || s.distanceM < 300) continue;
-            const r = (scene.projection.focalPx * puff.radiusM) / s.distanceM;
-            if (s.x + r < 0 || s.x - r > width || s.y + r < 0 || s.y - r > height) continue;
-            puffs.push({ x: s.x, y: s.y, r: Math.min(r, width), d: s.distanceM });
-          }
-        }
-        drawPuffs(ctx, puffs);
+        drawVirtualClouds(ctx, layoutVirtualClouds(scene.clouds, scene.projection, { width, height }), "day", 1);
+      } else if (fade > 0) {
+        drawVirtualClouds(ctx, layoutVirtualClouds(scene.clouds, scene.projection, { width, height }), fadeTint, fade);
       }
 
       // Aim: what the reticle points at, with a dwell so sensor jitter doesn't flicker selection.

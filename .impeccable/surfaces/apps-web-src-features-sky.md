@@ -19,7 +19,9 @@ Unresolved: author display (API returns only authorId); anonymous mode needs a c
 
 THESIS: The live camera sky is the photograph and stays unframed; posts are written into clouds as vapor, and the interface surfaces only as a photo-caption sheet when a cloud is chosen. Refuses the category default of floating labels, stickers and glass cards over AR.
 
-OWN-WORLD: White vapor letterforms lit from above with a shaded blue-grey underside (#ffffff on #2e4666 shadow), no outlines ever on the sky; a white caption sheet (#ffffff, ink #1b2533, secondary #5e7a99, hairline #e6eaee) with a coral primary (#e4572e); one humanist face (Atkinson Hyperlegible Next) at many sizes. The chosen cloud brightens with a feathered glow; others fade a step. State is form: crisp letters live, softened estimated, thin and faded stale. Upvotes set letter size.
+User steer (round 2, 2026-11-08): post text is near-black ink (rgb 38,41,46), not white vapor, for contrast against cloud. When real clouds can't be seen (after civil dusk, or indoors) the camera view draws photo cut-out clouds at the tracked footprints, fixed in the sky, as containers for the posts (moonlit tint at night); camera cloud matching is off in that state.
+
+OWN-WORLD: Near-black ink letterforms with a soft white halo (rgb 38,41,46 on a white glow), no outlines ever on the sky; a white caption sheet (#ffffff, ink #1b2533, secondary #5e7a99, hairline #e6eaee) with a coral primary (#e4572e); one humanist face (Atkinson Hyperlegible Next) at many sizes. The chosen cloud brightens with a feathered glow; others fade a step. State is form: crisp letters live, softened estimated, thin and faded stale. Upvotes set letter size.
 
 STORY: The visitor looks up, sees words sitting in clouds, aims or taps one, reads its caption sheet, upvotes, taps Post on this cloud, taps a spot, writes, watches the words settle into the cloud, and knows anyone under that sky will see them there.
 

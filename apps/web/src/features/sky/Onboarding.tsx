@@ -16,7 +16,8 @@ export function Onboarding({
   reason: string | null;
   onLookUp: () => void;
   onMap: () => void;
-  onSimulated: () => void;
+  /** Developer mode only; absent in user mode, which hides the simulated sky. */
+  onSimulated?: () => void;
 }) {
   return (
     <section className={styles.sheet} aria-labelledby="onboarding-title">
@@ -47,14 +48,16 @@ export function Onboarding({
               <MapIcon size={20} strokeWidth={2.25} aria-hidden="true" />
               Open the map
             </button>
-            <button type="button" className="drift-secondary" onClick={onSimulated}>
-              <Orbit size={18} strokeWidth={2.25} aria-hidden="true" />
-              Simulated sky
-            </button>
+            {onSimulated && (
+              <button type="button" className="drift-secondary" onClick={onSimulated}>
+                <Orbit size={18} strokeWidth={2.25} aria-hidden="true" />
+                Simulated sky
+              </button>
+            )}
           </>
         )}
       </div>
-      {handheld && (
+      {handheld && onSimulated && (
         <button type="button" className={`drift-textlink ${styles.sim}`} onClick={onSimulated}>
           No clouds where you are? Try the simulated sky over Troy, NY
         </button>
@@ -62,7 +65,7 @@ export function Onboarding({
       <p className={styles.privacy}>
         {handheld
           ? "Drift asks for your camera, location and compass so it can line posts up with the sky. Video stays on your phone. Your location is never posted."
-          : "On a phone, Drift uses the camera and compass to show posts in the real sky. Here, explore the same clouds on a map or in a simulated sky over Troy, NY."}
+          : `On a phone, Drift uses the camera and compass to show posts in the real sky. Here, explore the same clouds on a map${onSimulated ? " or in a simulated sky over Troy, NY" : ""}.`}
       </p>
     </section>
   );
