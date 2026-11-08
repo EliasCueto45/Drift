@@ -1,5 +1,5 @@
 "use client";
-import { ChevronRight, PenLine, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { useMemo } from "react";
 import type { Anchor, CloudWithPreviews } from "@/lib/contracts";
 import { PostItem } from "@/features/composer/PostItem";
@@ -14,21 +14,17 @@ function postCount(shown: number, previews: number) {
 import { directionTo, groundDistanceM, ringCentroid } from "./geo";
 import styles from "./sky.module.css";
 
-/** Shown only while a cloud is selected: its facts, up to three nearby posts, and actions. */
+/** Shown when a cloud is tapped: its facts, up to three nearby posts, and a link to all posts. (Posting starts from the cloud button in the dock.) */
 export function CloudPanel({
   item,
   viewer,
   onClose,
-  onPost,
   onOpen,
-  canPost,
 }: {
   item: CloudWithPreviews;
   viewer: Anchor;
   onClose: () => void;
-  onPost: () => void;
   onOpen: () => void;
-  canPost: boolean;
 }) {
   const { created } = usePosts();
   const cloud = item.cloud;
@@ -71,16 +67,11 @@ export function CloudPanel({
       )}
 
       <div className={styles.panelActions}>
-        <button type="button" className="drift-primary" onClick={onPost} disabled={!canPost}>
-          <PenLine size={18} strokeWidth={2.25} aria-hidden="true" />
-          Post on this cloud
-        </button>
         <button type="button" className="drift-secondary" onClick={onOpen}>
           All posts
           <ChevronRight size={18} strokeWidth={2.25} aria-hidden="true" />
         </button>
       </div>
-      {!canPost && <p className={styles.panelHint}>This cloud isn&apos;t taking new posts right now.</p>}
     </section>
   );
 }
