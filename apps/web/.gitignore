@@ -1,0 +1,10 @@
+# Frontend (Owner 1). Root .gitignore belongs to Owner 4.
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+certificates/
+.env*.local
+.clerk/
+.dev-logs/

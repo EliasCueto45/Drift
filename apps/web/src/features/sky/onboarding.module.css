@@ -1,0 +1,94 @@
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 20px calc(var(--safe-bottom) + 20px);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 28px rgba(27, 37, 51, 0.2);
+  animation: rise 320ms var(--ease-out);
+}
+
+@media (min-width: 700px) {
+  .sheet {
+    left: 50%;
+    right: auto;
+    bottom: 32px;
+    width: 440px;
+    transform: translateX(-50%);
+    border-radius: 20px;
+    padding-bottom: 24px;
+    animation-name: riseCentered;
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-2xl);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  margin: 0;
+  font-size: var(--t-l);
+  line-height: 1.35;
+  max-width: 32ch;
+}
+
+.reason {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--t-s);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.actions > * {
+  white-space: nowrap;
+}
+
+.sim {
+  align-self: flex-start;
+  min-height: 44px;
+  font-size: var(--t-s);
+  color: var(--ink);
+  text-align: left;
+}
+
+.privacy {
+  margin: 0;
+  font-size: var(--t-xs);
+  line-height: 1.45;
+  color: var(--ink-soft);
+  max-width: 52ch;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+@keyframes riseCentered {
+  from {
+    transform: translate(-50%, 24px);
+    opacity: 0;
+  }
+}

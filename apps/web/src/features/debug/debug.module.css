@@ -1,0 +1,38 @@
+.hud {
+  position: fixed;
+  z-index: 50;
+  left: max(8px, env(safe-area-inset-left));
+  top: calc(env(safe-area-inset-top) + 56px);
+  max-width: 62vw;
+  max-height: 60vh;
+  overflow: hidden;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #b8ffb8;
+  font: 11px/1.3 ui-monospace, Menlo, monospace;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hud dl {
+  margin: 0;
+}
+
+.hud div {
+  display: flex;
+  gap: 6px;
+}
+
+.hud dt {
+  color: #8fb3ff;
+  white-space: nowrap;
+}
+
+.hud dd {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

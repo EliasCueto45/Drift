@@ -1,0 +1,37 @@
+{
+  "name": "@drift/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Drift camera AR sky + map fallback (Owner 1). Node is frontend tooling only; the API is Python.",
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "dev:https": "next dev --port 3001 --experimental-https",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "contracts:gen": "node scripts/gen-contract-types.mjs",
+    "contracts:check": "node scripts/gen-contract-types.mjs --check"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "7.9.25",
+    "lucide-react": "1.70.0",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.5",
+    "json-schema-to-typescript": "16.0.0",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

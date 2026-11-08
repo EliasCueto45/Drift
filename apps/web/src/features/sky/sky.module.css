@@ -1,0 +1,466 @@
+/* ---------- Stage: the unframed sky ---------- */
+.app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #0d1a2e;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.video,
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.video {
+  object-fit: cover;
+}
+
+.canvas {
+  touch-action: none;
+  outline: none;
+}
+
+/* Focus on the sky: a white ring with a shaded edge reads on blue sky and on white cloud. */
+.canvas:focus-visible,
+.roundButton:focus-visible,
+.signInButton:focus-visible,
+.hint button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(46, 70, 102, 0.6);
+}
+
+.canvas:focus-visible {
+  outline-offset: -6px;
+  box-shadow: inset 0 0 0 9px rgba(46, 70, 102, 0.45);
+}
+
+.canvas[data-placing] {
+  cursor: crosshair;
+}
+
+.reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 3px rgba(27, 37, 51, 0.45);
+  pointer-events: none;
+  transition: transform var(--t-fast) var(--ease-out), border-width var(--t-fast) var(--ease-out);
+}
+
+.reticle[data-on="true"] {
+  transform: scale(0.62);
+  border-width: 3px;
+}
+
+/* ---------- On-camera chrome: minimal, always on solid backing ---------- */
+.topbar {
+  position: absolute;
+  top: calc(var(--safe-top) + 12px);
+  left: calc(var(--safe-left) + 12px);
+  right: calc(var(--safe-right) + 12px);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.topbar > * {
+  pointer-events: auto;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--scrim);
+  color: #fff;
+  font-size: var(--t-s);
+  font-weight: 600;
+  line-height: 1.2;
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+}
+
+.pill[data-tone="stale"] {
+  background: rgba(92, 64, 10, 0.78);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffd166;
+  flex: none;
+}
+
+.pill[data-tone="live"] .dot {
+  background: #6ee7a8;
+}
+
+.pill[data-tone="stale"] .dot {
+  background: #ffb020;
+}
+
+.roundButton {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--scrim);
+  color: #fff;
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  transition: transform var(--t-fast) var(--ease-out), background var(--t-fast);
+}
+
+.roundButton:active {
+  transform: scale(0.94);
+}
+
+.signInButton {
+  composes: pill;
+  border: 0;
+  min-height: 44px;
+  padding: 0 14px;
+}
+
+.bottomDock {
+  position: absolute;
+  left: calc(var(--safe-left) + 12px);
+  right: calc(var(--safe-right) + 12px);
+  bottom: calc(var(--safe-bottom) + 16px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.bottomDock > * {
+  pointer-events: auto;
+}
+
+.hint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: var(--radius-l);
+  background: var(--scrim);
+  color: #fff;
+  font-size: var(--t-s);
+  font-weight: 600;
+  text-align: center;
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+}
+
+.hint button {
+  border: 0;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-weight: 700;
+  font-size: var(--t-s);
+}
+
+.nudge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nudge button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+.toast {
+  position: absolute;
+  top: calc(var(--safe-top) + 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(92vw, 420px);
+  padding: 10px 14px;
+  border-radius: var(--radius-m);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--t-s);
+  font-weight: 600;
+  box-shadow: var(--shadow-2);
+  animation: rise var(--t-med) var(--ease-out);
+}
+
+/* ---------- Caption sheet (selected cloud) ---------- */
+.panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* About a third of a phone: the captioned cloud stays visible above it. */
+  max-height: min(40dvh, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px calc(var(--safe-bottom) + 14px);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 28px rgba(27, 37, 51, 0.2);
+  animation: rise var(--t-med) var(--ease-out);
+}
+
+@media (min-width: 700px) {
+  .panel {
+    left: auto;
+    right: 16px;
+    bottom: 16px;
+    width: 400px;
+    border-radius: 18px;
+    padding-bottom: 16px;
+  }
+}
+
+.panelHead,
+.sheetHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sheetHead {
+  justify-content: flex-start;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--t-xl);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.panelMeta {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: var(--t-s);
+}
+
+.panelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+
+.panelEmpty {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--t-m);
+  max-width: 34ch;
+}
+
+.panelHint {
+  margin: -4px 0 0;
+  color: var(--ink-soft);
+  font-size: var(--t-s);
+}
+
+.panelActions {
+  display: flex;
+  gap: 8px;
+}
+
+.iconButton {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -8px -10px 0 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  transition: background var(--t-fast);
+}
+
+.sheetHead .iconButton {
+  margin: -8px 0 0 -10px;
+}
+
+.iconButton:hover {
+  background: var(--paper-2);
+}
+
+.error {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: var(--t-s);
+  font-weight: 600;
+}
+
+/* ---------- Expanded sheet (all posts on a cloud) ---------- */
+.sheetBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 26, 46, 0.35);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fade var(--t-med) var(--ease-out);
+}
+
+.sheet {
+  width: 100%;
+  max-width: 560px;
+  height: min(88dvh, 820px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 0;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 18px 18px 0 0;
+  box-shadow: var(--shadow-2);
+  outline: none;
+  animation: rise var(--t-med) var(--ease-out);
+}
+
+.sheetBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(var(--safe-bottom) + 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.tab {
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: var(--t-s);
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.tab[aria-selected="true"] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+.skeleton {
+  height: 64px;
+  margin: 8px 0;
+  border-radius: var(--radius-m);
+  background: linear-gradient(90deg, var(--paper-2), #e9edf1, var(--paper-2));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+}
+
+.toast {
+  animation-name: toastIn;
+}
+
+@keyframes toastIn {
+  from {
+    transform: translate(-50%, -8px);
+    opacity: 0;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- Portrait lock ---------- */
+/* iOS Safari can't lock orientation, so a landscape phone gets a cover asking to turn upright. */
+.rotate {
+  display: none;
+}
+
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+  .rotate {
+    position: fixed;
+    z-index: 100;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: #0d1a2e;
+    color: #ffffff;
+    font-size: 1.125rem;
+    text-align: center;
+  }
+}
