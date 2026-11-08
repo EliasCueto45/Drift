@@ -6,6 +6,7 @@
   },
   "type": "module",
   "scripts": {
+    "start": "node serve.mjs",
     "config:check": "node config-check.mjs",
     "test": "node --test test/*.test.mjs test/database.integration.mjs",
     "test:db": "node --test test/database.integration.mjs",
