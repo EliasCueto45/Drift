@@ -28,6 +28,8 @@ NAMES = [
     "schema_migrations",
     "transaction_guards",
     "create_receipts",
+    "anonymous_sessions",
+    "posting_streaks",
 ]
 _source = None
 _lock = Lock()
@@ -100,7 +102,14 @@ def initialize(db):
     ]
     indexes += [
         (name, [("expires_at", 1)], {"expireAfterSeconds": 0})
-        for name in ("query_snapshots", "snapshot_items", "rate_windows", "create_receipts")
+        for name in (
+            "query_snapshots",
+            "snapshot_items",
+            "rate_windows",
+            "create_receipts",
+            "anonymous_sessions",
+            "posting_streaks",
+        )
     ]
     for name, keys, options in indexes:
         db[name].create_index(keys, **options)
