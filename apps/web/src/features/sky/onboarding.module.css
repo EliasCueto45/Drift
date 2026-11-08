@@ -43,13 +43,64 @@
 }
 
 .reason {
-  margin: 0;
-  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: var(--radius-m);
   background: var(--warn-bg);
   color: var(--warn);
   font-size: var(--t-s);
   font-weight: 600;
+  line-height: 1.4;
+}
+
+.reason p {
+  margin: 0;
+}
+
+.retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--warn);
+  font-size: var(--t-s);
+  font-weight: 700;
+}
+
+/* What happens next, said before the permission prompts rather than after them. */
+.before {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--t-s);
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.before li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.before svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--ink-soft);
+}
+
+.before strong {
+  font-weight: 700;
 }
 
 .actions {
@@ -60,7 +111,64 @@
 }
 
 .actions > * {
+  min-width: 0;
+}
+
+/* Busy is progress, not "unavailable": keep the accent and pulse it gently. */
+.actions :global(.drift-primary)[data-busy] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  animation: breathe 1.6s var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actions :global(.drift-primary)[data-busy] {
+    animation: none;
+  }
+}
+
+/* Desktop hand-off to a phone. */
+.handoff {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: var(--t-s);
+  line-height: 1.45;
+}
+
+.handoff p {
+  margin: 0;
+  max-width: 46ch;
+}
+
+.address {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: var(--t-s);
+  font-weight: 600;
+}
+
+.addressText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  user-select: all;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.72;
+  }
 }
 
 .sim {

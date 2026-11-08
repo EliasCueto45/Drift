@@ -20,10 +20,13 @@ export function CloudSheet({
   item,
   viewer,
   onClose,
+  onCloud = false,
 }: {
   item: CloudWithPreviews;
   viewer: Anchor;
   onClose: () => void;
+  /** Drawn over the zoomed-in cloud instead of on a white sheet. */
+  onCloud?: boolean;
 }) {
   const api = useApi();
   const { created, removed, syncVotes } = usePosts();
@@ -217,9 +220,10 @@ export function CloudSheet({
   const list = [...mine, ...page.items.filter((m) => !removed.has(m.id))];
 
   return (
-    <div className={styles.sheetBackdrop} onClick={onClose}>
+    <div className={styles.sheetBackdrop} data-surface={onCloud ? "cloud" : undefined} onClick={onClose}>
       <div
         className={styles.sheet}
+        data-surface={onCloud ? "cloud" : undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby="cloud-sheet-title"
