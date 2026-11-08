@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:migrate": "node ../../../../db/migrate.mjs",
     "lint": "node check.mjs"
   },
   "dependencies": {
