@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test test/*.test.mjs",
     "db:migrate": "node ../../../../db/migrate.mjs",
     "db:seed": "node ../../../../db/seed.mjs",
     "lint": "node check.mjs"
