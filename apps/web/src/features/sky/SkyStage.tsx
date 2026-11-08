@@ -6,6 +6,7 @@ import { DEG, multiPolygonContains } from "./geo";
 import { visibleHfovDeg } from "./orientation";
 import type { CameraPose } from "./projection";
 import { cloudPuffs, drawFootprintGlow, drawPuffs, drawSimulatedSky, drawVaporText, layoutPosts, setVaporFont, skyExcerpt, vaporFont, type PlacedPost } from "./render";
+import { acceptShift, bestShift, correctionFromShift, frameUsable, rasterize, segmentFrame, type RegistrationState } from "./registration";
 import { TAP_TOLERANCE_PX, anchorOnCloud, buildScene, nearestOffscreen, pickCloud, type SceneCloud } from "./scene";
 import type { SkyProjection } from "./projection";
 import { useLatest } from "@/lib/useLatest";
@@ -16,6 +17,20 @@ export interface SceneSummary {
   total: number;
   aimId: string | null;
   turn: { id: string; turnDeg: number } | null;
+}
+
+/** Result of one camera-to-satellite registration pass (docs/decisions/0004). */
+export interface RegistrationReport {
+  state: RegistrationState;
+  /** Incremental pose correction to apply; zero unless `accepted`. */
+  dAzDeg: number;
+  dElDeg: number;
+  accepted: boolean;
+  score: number | null;
+  baseScore: number | null;
+  cloudFraction: number;
+  validFraction: number;
+  ms: number;
 }
 
 export interface Draft {
@@ -45,11 +60,22 @@ interface Props {
   interactive: boolean;
   /** The post just published: it settles into the cloud from its draft state. */
   settle: { id: string; at: number } | null;
+  /** Camera mode: called a few times a second with the registration result. */
+  onRegister?: (r: RegistrationReport) => void;
+  /** Draw the cloud mask thumbnail (debug). */
+  debug?: boolean;
 }
 
 const SETTLE_MS = 600;
 
 const AIM_DWELL_MS = 450;
+const REGISTER_EVERY_MS = 333;
+/** Mask width in pixels; enough for cloud-scale shapes, cheap enough for a phone. */
+const MASK_W = 120;
+const MAX_TURN_DEG = 15;
+const MAX_TILT_DEG = 6;
+/** Below this elevation the camera sees trees and buildings, not sky. */
+const MIN_SKY_ELEVATION_SIN = Math.sin(4 * DEG);
 
 export function SkyStage(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -97,6 +123,11 @@ export function SkyStage(props: Props) {
     let aimReported: string | null | undefined = undefined;
     let lastSummary = 0;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let lastRegister = 0;
+    const grab = document.createElement("canvas");
+    const grabCtx = grab.getContext("2d", { willReadFrequently: true });
+    const thumb = document.createElement("canvas");
+    const thumbCtx = thumb.getContext("2d");
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -112,6 +143,58 @@ export function SkyStage(props: Props) {
       const extra: Record<string, Message[]> = postsRef.current.created;
       const scene = buildScene(p.clouds, pose, { width, height }, p.freshness, extra);
       sceneRef.current = scene;
+
+      if (p.mode === "camera" && video && stream && grabCtx && p.onRegister && now - lastRegister > REGISTER_EVERY_MS) {
+        lastRegister = now;
+        const t0 = performance.now();
+        // Same crop as the object-fit: cover video, downscaled.
+        const mw = MASK_W;
+        const mh = Math.round((MASK_W * height) / width);
+        const cover = Math.max(width / stream.width, height / stream.height);
+        const sw = width / cover;
+        const sh = height / cover;
+        if (grab.width !== mw || grab.height !== mh) {
+          grab.width = mw;
+          grab.height = mh;
+        }
+        grabCtx.drawImage(video, (stream.width - sw) / 2, (stream.height - sh) / 2, sw, sh, 0, 0, mw, mh);
+        const k = width / mw;
+        const proj = scene.projection;
+        const mask = segmentFrame(grabCtx.getImageData(0, 0, mw, mh).data, mw, mh, (x, y) => proj.rayAt((x + 0.5) * k, (y + 0.5) * k)[2] > MIN_SKY_ELEVATION_SIN);
+        const rings = scene.clouds.flatMap((c) => c.rings.map((r) => r.map((pt) => ({ x: pt.x / k, y: pt.y / k }))));
+        const model = rasterize(rings, mw, mh);
+        const unusable = frameUsable(mask);
+        const fPx = proj.focalPx / k;
+        const r = unusable ? null : bestShift(mask, model, Math.ceil(fPx * Math.tan(MAX_TURN_DEG * DEG)), Math.ceil(fPx * Math.tan(MAX_TILT_DEG * DEG)));
+        const accepted = Boolean(r && acceptShift(r));
+        const c =
+          r && accepted
+            ? correctionFromShift((x, y) => proj.rayAt(x, y), { x: width / 2, y: height / 2 }, { x: width / 2 + r.dx * k, y: height / 2 + r.dy * k })
+            : { dAzDeg: 0, dElDeg: 0 };
+        const state: RegistrationState = unusable ?? (!r ? "no-clouds" : accepted || (r.baseScore > 0.35 && r.coverage > 0.5) ? "matched" : "searching");
+        p.onRegister({
+          state,
+          ...c,
+          accepted,
+          score: r?.score ?? null,
+          baseScore: r?.baseScore ?? null,
+          cloudFraction: mask.cloudFraction,
+          validFraction: mask.validFraction,
+          ms: performance.now() - t0,
+        });
+        if (p.debug && thumbCtx) {
+          // Thumbnail: cloud white, sky blue, unusable black, tracked outlines tinted red.
+          thumb.width = mw;
+          thumb.height = mh;
+          const img = thumbCtx.createImageData(mw, mh);
+          for (let i = 0; i < mw * mh; i++) {
+            const v = mask.cloud[i]! * 255;
+            const on = model[i] ? 1 : 0;
+            img.data.set(mask.valid[i] ? [Math.min(255, v + on * 120), v * (1 - on * 0.5), on ? v * 0.5 : 255, 255] : [on * 160, 0, 0, 255], i * 4);
+          }
+          thumbCtx.putImageData(img, 0, 0);
+        }
+      }
 
       if (p.mode === "simulated") {
         const horizonY = height / 2 + scene.projection.focalPx * Math.tan(pose.elevationDeg * DEG);
@@ -170,6 +253,13 @@ export function SkyStage(props: Props) {
         } else drawVaporText(ctx, post);
       }
       drawDraft(ctx, draftPost);
+      if (p.debug && p.mode === "camera" && thumb.width) {
+        const tw = 120;
+        const th = (tw * thumb.height) / thumb.width;
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(thumb, width - tw - 8, height - th - 96, tw, th);
+        ctx.globalAlpha = 1;
+      }
 
       if (now - lastSummary > 400) {
         lastSummary = now;

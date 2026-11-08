@@ -23,14 +23,19 @@ import {
   useWatchedLocation,
   type ViewerLocation,
 } from "./sensors";
-import { SkyStage, type Draft, type SceneSummary } from "./SkyStage";
+import { SkyStage, type Draft, type RegistrationReport, type SceneSummary } from "./SkyStage";
 import { useSky } from "./useSky";
 import { useLatest, useMediaQuery } from "@/lib/useLatest";
+import { DebugHud, type DebugSnapshot } from "@/features/debug/DebugHud";
+import { remoteLog, startRemoteLog } from "@/features/debug/remoteLog";
 import styles from "./sky.module.css";
 
 type View = "welcome" | "camera" | "simulated" | "map";
 
-export function DriftApp({ datasetId, initialView }: { datasetId: string; initialView: View | null }) {
+export function DriftApp({ datasetId, initialView, debug = false }: { datasetId: string; initialView: View | null; debug?: boolean }) {
+  useEffect(() => {
+    if (debug) startRemoteLog();
+  }, [debug]);
   const api = useApi();
   const { notice, notify, addCreated } = usePosts();
   const synthetic = config.isSyntheticDataset(datasetId);
@@ -40,6 +45,7 @@ export function DriftApp({ datasetId, initialView }: { datasetId: string; initia
   const [reason, setReason] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [granted, setGranted] = useState<ViewerLocation | null>(null);
+  const [locationOff, setLocationOff] = useState(false);
   const location = useWatchedLocation(Boolean(granted), granted);
 
   const viewer: Anchor = location ?? config.simulatedViewer;
@@ -150,13 +156,31 @@ export function DriftApp({ datasetId, initialView }: { datasetId: string; initia
     };
   }, [live]);
 
-  const getCameraPose = useCallback((): Omit<CameraPose, "hfovDeg"> | null => {
+  // Camera-to-satellite registration (docs/decisions/0004): a smoothed pose correction that
+  // lays tracked outlines over the clouds the camera actually sees.
+  const reg = useRef({ az: 0, el: 0, last: null as RegistrationReport | null, matchedAt: 0 });
+  const [matched, setMatched] = useState(false);
+  const onRegister = useCallback((r: RegistrationReport) => {
+    const g = reg.current;
+    g.last = r;
+    if (r.accepted) {
+      g.az = Math.max(-20, Math.min(20, g.az + 0.35 * r.dAzDeg));
+      g.el = Math.max(-6, Math.min(6, g.el + 0.35 * r.dElDeg));
+    }
+    const now = performance.now();
+    if (r.state === "matched") g.matchedAt = now;
+    setMatched(g.matchedAt > 0 && now - g.matchedAt < 5000);
+  }, []);
+
+  // Plain function: SkyStage reads the latest one through a ref each frame.
+  const getCameraPose = (): Omit<CameraPose, "hfovDeg"> | null => {
     const vectors = orientation.reading.current.vectors;
     if (!vectors) return null;
     const { viewer: v, nudge: n, declination: d } = live.current;
-    const a = poseAngles(vectors, (d ?? 0) + n);
+    const a = poseAngles(vectors, (d ?? 0) + n + reg.current.az);
+    a.elevationDeg = Math.max(-89, Math.min(89, a.elevationDeg + reg.current.el));
     return { longitude: v.longitude, latitude: v.latitude, heightM: 0, heightReference: "unknown", ...a, source: "sensors" };
-  }, [orientation.reading, live]);
+  };
 
   const panSim = useCallback((dAz: number, dEl: number) => {
     sim.current.az = (sim.current.az + dAz + 360) % 360;
@@ -179,6 +203,54 @@ export function DriftApp({ datasetId, initialView }: { datasetId: string; initia
 
   useEffect(() => () => stopStream(stream), [stream]);
 
+  // ---- Debug readout (?debug=1) ----
+  const perms = useRef<{ motion: string; camera: string; location: string }>({ motion: "-", camera: "-", location: "-" });
+  const rate = useRef({ count: 0, at: 0, hz: 0 });
+  const debugSnapshot = (): DebugSnapshot => {
+    const d = { view, location, skyStatus, clouds: clouds.length, summary, declination, nudge, stream };
+    const r = orientation.reading.current;
+    const g = reg.current;
+    const now = performance.now();
+    if (now - rate.current.at >= 1000) {
+      rate.current.hz = rate.current.at ? ((r.count - rate.current.count) * 1000) / (now - rate.current.at) : 0;
+      rate.current = { count: r.count, at: now, hz: rate.current.hz };
+    }
+    const pose = d.view === "camera" ? getCameraPose() : null;
+    const video = document.querySelector("video");
+    const settings = d.stream?.getVideoTracks()[0]?.getSettings();
+    const vw = video?.videoWidth ?? 0;
+    const vh = video?.videoHeight ?? 0;
+    return {
+      view: d.view,
+      perms: `cam ${perms.current.camera} · motion ${perms.current.motion} · loc ${perms.current.location}`,
+      orient: orientation.status,
+      src: r.raw?.source ?? null,
+      hz: Math.round(rate.current.hz),
+      heading: r.raw?.heading ?? null,
+      compassAcc: r.accuracyDeg,
+      alpha: r.raw?.alpha ?? null,
+      beta: r.raw?.beta ?? null,
+      gamma: r.raw?.gamma ?? null,
+      scrAngle: r.raw?.screenAngle ?? null,
+      az: pose?.azimuthDeg ?? null,
+      el: pose?.elevationDeg ?? null,
+      roll: pose?.rollDeg ?? null,
+      decl: d.declination,
+      nudge: d.nudge,
+      gps: d.location ? `${d.location.latitude.toFixed(5)}, ${d.location.longitude.toFixed(5)}` : "simulated",
+      gpsAcc: d.location ? Math.round(d.location.accuracyM) : null,
+      video: vw ? `${vw}x${vh}` : null,
+      track: settings ? `${settings.width}x${settings.height} ${settings.facingMode ?? ""} ${settings.frameRate ? Math.round(settings.frameRate) + "fps" : ""}` : null,
+      viewport: `${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio}`,
+      hfov: visibleHfovDeg({ width: window.innerWidth, height: window.innerHeight }, vw ? { width: vw, height: vh } : null),
+      sky: `${d.skyStatus} · ${d.clouds} clouds · ${d.summary?.visible ?? 0} in view`,
+      reg: g.last ? `${g.last.state}${g.last.accepted ? " +" : ""} ${Math.round(g.last.ms)}ms` : null,
+      regFix: `az ${g.az.toFixed(1)} el ${g.el.toFixed(1)}`,
+      regScore: g.last?.score != null ? `${g.last.score.toFixed(2)} (base ${g.last.baseScore?.toFixed(2)})` : null,
+      regMask: g.last ? `cloud ${Math.round(g.last.cloudFraction * 100)}% · sky ${Math.round(g.last.validFraction * 100)}%` : null,
+    };
+  };
+
   // ---- Entering the camera ----
   async function lookUp() {
     setBusy(true);
@@ -188,25 +260,29 @@ export function DriftApp({ datasetId, initialView }: { datasetId: string; initia
     const cam = await requestCamera();
     const loc = await requestLocationOnce();
     setBusy(false);
-    const missing: string[] = [];
-    if (cam.status !== "granted") missing.push("camera");
-    if (motion !== "granted") missing.push("motion sensors");
-    if (loc.status !== "granted") missing.push("location");
+    perms.current = { motion, camera: cam.status, location: loc.status };
+    remoteLog("permissions", { ...perms.current, track: cam.stream?.getVideoTracks()[0]?.getSettings() ?? null, location: loc.location });
     if (loc.location) setGranted(loc.location);
-    if (missing.length) {
+    setLocationOff(loc.status !== "granted");
+    // Only the camera is required for the camera view. Missing motion or location degrades
+    // alignment (and says so); it doesn't take the user out of the sky.
+    if (cam.status !== "granted") {
       stopStream(cam.stream);
-      const list = missing.join(" and ").replace(/ and (?=.* and )/, ", ");
-      const denied = [cam.status, motion, loc.status].includes("denied");
       setReason(
-        `${denied ? "Without" : "This browser can't give Drift"} ${list}, ${denied ? "Drift can't line posts up with the sky" : "access, so the camera view isn't available"}. The map has the same clouds and posts${
-          loc.status === "granted" ? "" : " (around Troy, NY until location is allowed)"
-        }.`,
+        cam.status === "denied"
+          ? "Drift needs the camera to show posts on the sky. Allow it with the aA button in Safari's address bar, then Website Settings. The map has the same clouds and posts."
+          : "This browser can't open the camera, so here's the map with the same clouds and posts.",
       );
       setView("map");
       return;
     }
     setStream(cam.stream);
     setView("camera");
+    if (motion !== "granted") {
+      notify("Motion access is off, so posts can't follow where the phone points. Allow Motion & Orientation in Safari settings.");
+    } else if (loc.status !== "granted") {
+      notify("Location is off, so positions assume you're in Troy, NY. Turn on Location Services for Safari Websites to fix.");
+    }
   }
 
   function leaveCamera(to: View) {
@@ -363,6 +439,8 @@ export function DriftApp({ datasetId, initialView }: { datasetId: string; initia
           label={stageLabel}
           interactive={view !== "welcome"}
           settle={settle}
+          onRegister={view === "camera" ? onRegister : undefined}
+          debug={debug}
         />
       )}
       {view === "map" && (
@@ -390,10 +468,11 @@ export function DriftApp({ datasetId, initialView }: { datasetId: string; initia
           {view === "camera" && (
             <button type="button" className={styles.signInButton} onClick={() => setCalibrating((c) => !c)} aria-pressed={calibrating}>
               <Compass size={16} aria-hidden="true" />
-              {declination === null ? "Compass uncorrected" : "Estimated positions"}
+              {matched ? "Matched to visible clouds" : declination === null ? "Compass uncorrected" : "Approximate positions"}
             </button>
           )}
           {view === "map" && !viewerIsReal && <span className={styles.pill}>Showing Troy, NY</span>}
+          {view === "camera" && locationOff && !viewerIsReal && <span className={styles.pill}>Location off · assuming Troy, NY</span>}
         </div>
         {view !== "welcome" && <AccountButton className={styles.signInButton} />}
       </header>
@@ -461,6 +540,13 @@ export function DriftApp({ datasetId, initialView }: { datasetId: string; initia
       )}
 
       {sheetItem && <CloudSheet item={sheetItem} viewer={viewer} onClose={() => setSheetId(null)} />}
+
+      {debug && <DebugHud snapshot={debugSnapshot} />}
+
+      {/* Portrait only: the camera view's alignment and layout assume an upright phone. */}
+      <div className={styles.rotate} role="alert">
+        Turn your phone upright to use Drift.
+      </div>
     </main>
   );
 }

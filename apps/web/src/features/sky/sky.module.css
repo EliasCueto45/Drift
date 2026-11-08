@@ -443,3 +443,24 @@
     background-position: -200% 0;
   }
 }
+
+/* ---------- Portrait lock ---------- */
+/* iOS Safari can't lock orientation, so a landscape phone gets a cover asking to turn upright. */
+.rotate {
+  display: none;
+}
+
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+  .rotate {
+    position: fixed;
+    z-index: 100;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: #0d1a2e;
+    color: #ffffff;
+    font-size: 1.125rem;
+    text-align: center;
+  }
+}

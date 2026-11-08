@@ -98,6 +98,10 @@ export interface OrientationReading {
   /** iOS compass accuracy in degrees, when reported. */
   accuracyDeg: number | null;
   lastAt: number;
+  /** Raw values from the last event, for the debug overlay. */
+  raw: { alpha: number | null; beta: number; gamma: number; heading: number | null; source: "absolute" | "ios-compass" | "relative"; screenAngle: number } | null;
+  /** Events applied since the hook started (debug: sensor rate). */
+  count: number;
 }
 
 function screenAngle() {
@@ -113,34 +117,51 @@ function screenAngle() {
  * Android: `deviceorientationabsolute`. iOS: relative alpha replaced by webkitCompassHeading.
  */
 export function useOrientation(enabled: boolean, onSilent?: () => void) {
-  const reading = useRef<OrientationReading>({ vectors: null, absolute: false, accuracyDeg: null, lastAt: 0 });
+  const reading = useRef<OrientationReading>({ vectors: null, absolute: false, accuracyDeg: null, lastAt: 0, raw: null, count: 0 });
   const [status, setStatus] = useState<"waiting" | "live" | "relative" | "silent">("waiting");
   const silentRef = useLatest(onSilent);
 
   useEffect(() => {
     if (!enabled) return;
     let gotAbsolute = false;
-    const apply = (alpha: number, beta: number, gamma: number, absolute: boolean, accuracy: number | null) => {
-      const next = deviceVectors(alpha, beta, gamma, screenAngle());
+    const apply = (
+      alpha: number,
+      beta: number,
+      gamma: number,
+      absolute: boolean,
+      accuracy: number | null,
+      raw: NonNullable<OrientationReading["raw"]>,
+    ) => {
+      const angle = screenAngle();
+      const next = deviceVectors(alpha, beta, gamma, angle);
       const r = reading.current;
       r.vectors = smoothVectors(r.vectors, next, 0.22);
       r.absolute = absolute;
       r.accuracyDeg = accuracy;
       r.lastAt = performance.now();
+      r.raw = { ...raw, screenAngle: angle };
+      r.count += 1;
     };
     const onAbsolute = (e: DeviceOrientationEvent) => {
       if (e.alpha == null || e.beta == null || e.gamma == null) return;
       gotAbsolute = true;
-      apply(e.alpha, e.beta, e.gamma, true, null);
+      apply(e.alpha, e.beta, e.gamma, true, null, { alpha: e.alpha, beta: e.beta, gamma: e.gamma, heading: null, source: "absolute", screenAngle: 0 });
     };
     const onRelative = (e: DeviceOrientationEvent) => {
       const ios = e as IOSOrientationEvent;
       if (e.beta == null || e.gamma == null) return;
       if (typeof ios.webkitCompassHeading === "number" && ios.webkitCompassHeading >= 0) {
         const acc = typeof ios.webkitCompassAccuracy === "number" && ios.webkitCompassAccuracy >= 0 ? ios.webkitCompassAccuracy : null;
-        apply(alphaFromCompassHeading(ios.webkitCompassHeading), e.beta, e.gamma, true, acc);
+        apply(alphaFromCompassHeading(ios.webkitCompassHeading), e.beta, e.gamma, true, acc, {
+          alpha: e.alpha,
+          beta: e.beta,
+          gamma: e.gamma,
+          heading: ios.webkitCompassHeading,
+          source: "ios-compass",
+          screenAngle: 0,
+        });
       } else if (!gotAbsolute && e.alpha != null) {
-        apply(e.alpha, e.beta, e.gamma, e.absolute === true, null);
+        apply(e.alpha, e.beta, e.gamma, e.absolute === true, null, { alpha: e.alpha, beta: e.beta, gamma: e.gamma, heading: null, source: "relative", screenAngle: 0 });
       }
     };
     window.addEventListener("deviceorientationabsolute", onAbsolute as EventListener);
