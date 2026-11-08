@@ -1,4 +1,4 @@
-"""Manual online check: current NOAA -> actual backend -> embedded PostGIS.
+"""Manual online check: current NOAA -> Python API -> disposable MongoDB.
 
 Run from repo root after installing backend dependencies. This is not a deployed
 Postgres/Clerk/S3 check. Uses an isolated disposable backend and new worker state.
@@ -6,7 +6,7 @@ Postgres/Clerk/S3 check. Uses an isolated disposable backend and new worker stat
 import json
 import os
 from pathlib import Path
-import shutil
+import sys
 import subprocess
 import tempfile
 
@@ -22,8 +22,8 @@ def run():
     state=Path(tempfile.mkdtemp(prefix='backend-live-',dir=output))
     env=dict(os.environ,TRACKING_INGEST_SECRET='isolated-live-smoke-only',
              TEST_DATASET='troy-backend-live',TEST_MODE='live',TEST_RUN='regional-v1')
-    process=subprocess.Popen([shutil.which('node'),str(Path(__file__).with_name('backend-harness.mjs'))],
-                             cwd=root,env=env,stdout=subprocess.PIPE,text=True)
+    process=subprocess.Popen([sys.executable,'-m','drift_tools.backend_harness'],
+                             cwd=root,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
     try:
         ready=process.stdout.readline()
         if not ready:
@@ -38,11 +38,11 @@ def run():
         persisted=api.state('troy-backend-live')
         assert persisted['sequence']>0
         sky=api.request('GET','/api/v1/sky?lat=42.73&lng=-73.68&radiusM=50000&datasetId=troy-backend-live')
-        print(json.dumps({'backend':'actual handlers, embedded PostGIS','sequence':persisted['sequence'],
+        print(json.dumps({'backend':'Python API, disposable MongoDB','sequence':persisted['sequence'],
                           'clouds':len(persisted['clouds']),'freshness':sky['data']['freshness'],
                           'stateDirectory':str(state)}),flush=True)
     finally:
-        process.terminate();process.wait(timeout=15)
+        process.stdin.close();process.wait(timeout=30)
         process.stdout.close()
 
 
