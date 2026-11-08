@@ -12,6 +12,7 @@ from .records import (
     expire_message,
     message_record,
     public_message,
+    public_author,
     save_cloud,
 )
 from .validation import (
@@ -83,7 +84,7 @@ def create_message(ctx, cloud_id, value, user):
     )
     if asset:
         collection(ctx, "assets").update_one({"_id": asset["id"]}, {"$set": {"attached_message_id": id}})
-    return {"data": message}
+    return {"data": {**message, "author": public_author(ctx, user["id"])}}
 
 
 def delete_message(ctx, id, user):
@@ -113,7 +114,7 @@ def upvote(ctx, id, value, user):
 
 
 def create_cloud(ctx, value, user):
-    exact(value, ["outline", "assumedAltitudeM"])
+    exact(value, ["outline", "assumedAltitudeM", "datasetId"])
     validate("CreateCloudRequest", value)
     vertices = outline_vertices(value["outline"])
     validate_geometry(value["outline"])
@@ -124,7 +125,7 @@ def create_cloud(ctx, value, user):
                 <= 10000,
                 "Outline diameter exceeds 10 km",
             )
-    ds_id = os.getenv("DRIFT_DATASET_ID")
+    ds_id = value.get("datasetId") or os.getenv("DRIFT_DATASET_ID")
     if not ds_id:
         fail(503, "NOT_CONFIGURED", "DRIFT_DATASET_ID required")
     ds = dataset_time(ctx, ds_id)
