@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "drift"
+version = "0.2.0"
+requires-python = ">=3.12,<3.14"
+dependencies = ["fastapi", "uvicorn", "pymongo>=4.10,<5", "PyJWT[crypto]", "httpx", "boto3", "shapely>=2", "pyproj", "av", "Pillow", "jsonschema", "rfc3339-validator", "python-dotenv"]
+
+[project.optional-dependencies]
+test = ["pytest", "ruff", "mypy", "httpx2"]
+
+[project.scripts]
+drift = "drift_api.cli:main"
+drift-tools = "drift_tools.cli:main"
+
+[tool.setuptools]
+packages = ["drift_api", "drift_tools"]
+package-dir = {drift_api = "apps/web/src/server/drift_api", drift_tools = "tools/drift_tools"}
+
+[tool.setuptools.package-data]
+drift_tools = ["scenarios.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/web/src/server/tests", "packages/contracts/python"]
+pythonpath = ["apps/web/src/server", "tools", "packages/contracts/python"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+include = ["apps/web/src/server/drift_api/**/*.py", "apps/web/src/server/tests/**/*.py", "tools/drift_tools/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B"]
+
+[tool.mypy]
+files = ["apps/web/src/server/drift_api", "tools/drift_tools"]
+ignore_missing_imports = true
+follow_imports = "silent"
+check_untyped_defs = true

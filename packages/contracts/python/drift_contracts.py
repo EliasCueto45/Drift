@@ -1,4 +1,4 @@
-"""Python side of the Drift contract: validates against the SAME JSON Schema as TypeScript.
+"""Drift contract validator: reads the canonical versioned JSON Schema directly.
 Owner 3 imports `validate("TrackingBatch", obj)` before posting; CI runs this on every fixture.
 Add pydantic generation later if wanted (datamodel-code-generator reads the same schema)."""
 import json, math

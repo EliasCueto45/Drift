@@ -1,6 +1,6 @@
 # AR follow-up handoffs from Owner 3
 
-Read [decision 0003](../decisions/0003-ar-height-and-content-tracking.md). Worker output now carries optional canonical `Cloud.altitude`; generated TS types are regenerated from the schema, never hand-edited. Existing `wind.altitudeM` remains available. The live supervisor defaults to content-driven tracking; replay remains compatible.
+Read [decision 0003](../decisions/0003-ar-height-and-content-tracking.md). Worker output now carries optional canonical `Cloud.altitude`; Python validators read the canonical schema directly; the Python runtime decision removes generated TS bindings. Existing `wind.altitudeM` remains available. The live supervisor defaults to content-driven tracking; replay remains compatible.
 
 ## Owner 1 — Phone camera and projection
 
@@ -20,7 +20,7 @@ Read [decision 0003](../decisions/0003-ar-height-and-content-tracking.md). Worke
 
 ## Owner 4 — Contract and integration review
 
-- Review additive optional `Cloud.altitude` in the canonical schema and its generated TS binding. Legacy v1 fixtures intentionally omit it and remain valid. Coordinate frontend use without requiring old consumers to send it.
+- Review additive optional `Cloud.altitude` in the canonical schema and its Python validator coverage. Legacy v1 fixtures intentionally omit it and remain valid. Coordinate frontend use without requiring old consumers to send it.
 - Agree viewer altitude reference/geoid conversion and optional fixed-orientation representation with Owner 1 before advertising accurate AR. Do not rename/remove message kinds as part of this additive change.
 - Review source vertical metadata before enabling manifest parallax correction; supply a verified reference and local geoid value. Keep unknown datum and approximate placement visible. No hardcoded geoid value has been invented.
 - Run worker tests with DRIFT_TEST_BACKEND=1 after installing Owner 2's backend dependencies. The migrated harness now delegates to Owner 2's MongoDB implementation; older PostGIS tests are no longer launched.

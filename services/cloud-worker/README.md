@@ -1,18 +1,14 @@
 # Drift cloud worker — Owner 3
 
-## Camera AR integration update
+## AR additions retained across the Python API migration
 
-The worker provides geographic cloud/anchor estimates; the frontend owns camera projection and viewer-facing billboards. Optional canonical `Cloud.altitude` now exposes meters, vertical datum, source, measured fraction, estimated status and parallax status. `wind.altitudeM` stays compatible. Unknown datum remains explicitly unknown. Read [the AR handoffs](../../docs/handoffs/owner-3-ar.md) and [decision 0003](../../docs/decisions/0003-ar-height-and-content-tracking.md).
+Optional canonical `Cloud.altitude` carries height reference/source/estimated fraction and parallax status; `wind.altitudeM` remains compatible. Content-driven live tracking still uses the same v1 state/ingest endpoints through FastAPI. Camera projection/viewer elevation and fixed-orientation rendering remain frontend work. See [the AR handoffs](../../docs/handoffs/owner-3-ar.md) and [the height/tracking decision](../../docs/decisions/0003-ar-height-and-content-tracking.md). Python validators now read JSON Schema directly; generated TypeScript artifacts are intentionally removed.
 
-Current-sky acquisition defaults to `--tracking-policy content`: empty regions remain discoverable but do not undergo temporal matching; occupied clouds and pending descendants do. User-created clouds retain their independent wind/lifetime rules. Use `--tracking-policy all` for comparison. Policy is checkpointed and can change only after acknowledging any pending batch unchanged; do not reset the dataset sequence.
-
-For a manually verified manifest, `parallaxCorrection: true` enables approximate height-based inverse sampling. It requires a documented `heightReference` and, for sea-level/assumed pixels, a verified regional `geoidUndulationM`. There is no automatic default offset. The current catalog path leaves this correction disabled until its vertical metadata is reviewed. `cloud_worker.altitude` provides datum conversion and ECEF/ENU direction reference tests, not a second screen projection.
-
-Wind-assisted regional cloud tracking, local message/artwork advection, lineage, lifecycle evidence, durable delivery and replay. The service is integrated with Owner 2's backend HTTP handlers and embedded PostGIS tests; deployed services and browser verification remain separate acceptance checks. Offline output uses Owner 4's shared Python validator; publishing uses the same canonical batch schema. The backend state/ack requirements are in [the integration proposal](../../docs/decisions/owner-3-tracking-integration.md).
+Wind-assisted regional cloud tracking, local message/artwork advection, lineage, lifecycle evidence, durable delivery and replay. The service integrates with the Python FastAPI backend and MongoDB replica-set transactions; deployed services and browser verification remain separate acceptance checks. Offline output uses the shared Python validator; publishing uses the same canonical batch schema. Backend state/ack requirements are in [the integration proposal](../../docs/decisions/owner-3-tracking-integration.md).
 
 ## Actual backend integration checks
 
-Owner 2's backend branch is included in this integration checkout. Install its locked dependencies with `npm ci --prefix apps/web/src/server`, then enable `DRIFT_TEST_BACKEND=1` in the environment before running the worker pytest suite. The opt-in test uses real backend handlers, transactions and an embedded PostgreSQL/PostGIS database with an explicitly injected synthetic identity. It verifies worker state reads, text posting/voting, splitting, holding/reconnecting orphan messages, duplicate delivery and confirmed expiry. It is skipped explicitly when not enabled; ordinary CI does not implicitly install the backend's separate dependency package.
+Follow the root README to install `requirements.lock.txt` and both editable Python packages, then enable `DRIFT_TEST_BACKEND=1` before running the worker suite. The opt-in test uses the real FastAPI handlers and a disposable MongoDB replica set with an explicitly injected synthetic identity. Supply `DRIFT_TEST_MONGODB_URI` or a local `mongod`/`MONGOD_BINARY`. It verifies worker state reads, text posting/voting, splitting, holding/reconnecting orphan messages, duplicate delivery and confirmed expiry. CI enables this integration explicitly; the test never uses the production Atlas URI.
 
 For an online, current-sky check through those same backend handlers:
 
@@ -125,4 +121,4 @@ An additional real-data smoke check loaded GOES-19 CONUS ACM masks at **2025-07-
 
 References: [NOAA ACM metadata](https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ncdc%3AC01503), [NOAA DMW algorithm](https://www.star.nesdis.noaa.gov/goesr/documents/ATBDs/Enterprise/ATBD_Enterprise_Derived_Motion_Winds_v4.2_2024_06_05.pdf), [PROJ geostationary geometry](https://proj.org/en/stable/operations/projections/geos.html), [OpenCV optical flow](https://docs.opencv.org/4.x/d4/dee/tutorial_optical_flow.html).
 
-Integration check after pulling main: the full publish CLI, restart/deduplication and shared smoke suite pass against tools/mock-api.mjs. This development mock now exposes worker state; it remains in-memory and does not establish real DB transaction correctness.
+The full publish CLI, restart/deduplication and shared smoke suite also run against `python -m drift_tools.cli mock`. This in-memory development mock exposes worker state; the separate real FastAPI/MongoDB test establishes persistence behavior.

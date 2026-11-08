@@ -1,8 +1,8 @@
-"""Opt-in: requires Owner 2's npm ci and tests actual handlers/SQL, not the mock."""
+"""Opt-in: actual Python API and disposable MongoDB replica set."""
 import json
 import os
 from pathlib import Path
-import shutil
+import sys
 import subprocess
 
 import pytest
@@ -15,13 +15,12 @@ from cloud_worker.wind import WindField
 from test_engine import G, frame
 
 
-@pytest.mark.skipif(os.getenv('DRIFT_TEST_BACKEND') != '1', reason='opt-in backend/PostGIS dependency install required')
-def test_python_worker_against_backend_postgis(tmp_path):
+@pytest.mark.skipif(os.getenv('DRIFT_TEST_BACKEND') != '1', reason='requires disposable MongoDB replica set')
+def test_python_worker_against_backend_mongodb(tmp_path):
     root=Path(__file__).resolve().parents[3]
-    harness=Path(__file__).with_name('backend-harness.mjs')
-    process=subprocess.Popen([shutil.which('node'),str(harness)],cwd=root,
+    process=subprocess.Popen([sys.executable,'-m','drift_tools.backend_harness'],cwd=root,
                              env=dict(os.environ,TRACKING_INGEST_SECRET='backend-test-only'),
-                             stdout=subprocess.PIPE,stderr=None,text=True)
+                             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=None,text=True)
     try:
         ready=process.stdout.readline()
         assert ready, 'backend harness exited before listening'
@@ -61,5 +60,5 @@ def test_python_worker_against_backend_postgis(tmp_path):
         assert api.state('backend-worker-demo')['messages']==[]
         assert journal.engine().sequence == 7
     finally:
-        process.terminate();process.wait(timeout=15)
+        process.stdin.close();process.wait(timeout=30)
         process.stdout.close()
