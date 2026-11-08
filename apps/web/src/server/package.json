@@ -10,6 +10,7 @@
     "config:check": "node config-check.mjs",
     "db:check": "node ../../../../db/check.mjs",
     "db:prepare": "node ../../../../db/prepare.mjs",
+    "smoke:atlas": "node ../../../../db/smoke.mjs",
     "test": "node --test test/*.test.mjs test/database.integration.mjs",
     "test:db": "node --test test/database.integration.mjs",
     "db:migrate": "node ../../../../db/migrate.mjs",
