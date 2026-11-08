@@ -86,8 +86,8 @@ export function Composer({
   }, [kind, body, link, onDraft]);
 
   useEffect(() => {
-    if (auth.signedIn) textRef.current?.focus({ preventScroll: true });
-  }, [auth.signedIn, kind]);
+    if (auth.ready) textRef.current?.focus({ preventScroll: true });
+  }, [auth.ready, kind]);
 
   const problem = kind === "text" ? validateText(body) : validateLink(link);
   const showProblem = touched && problem;
@@ -96,7 +96,7 @@ export function Composer({
     e.preventDefault();
     setTouched(true);
     if (problem || busy || submitting.current) return;
-    if (!auth.signedIn) return auth.signIn();
+    if (!auth.ready) return;
     if (!placementInRange(viewer, anchor)) {
       setError(
         `Choose a spot within ${DISCOVERY_RADIUS_M / 1000} km so you can find it again in your nearby sky.`,
@@ -159,8 +159,8 @@ export function Composer({
       }
       if (err instanceof DriftApiError) {
         if (err.status === 401) {
-          setError("Your sign-in expired. Sign in again to post.");
-          auth.signIn();
+          setError(auth.signedIn ? "Your sign-in expired. Sign in again to post." : "Your anonymous session expired. Try posting again.");
+          if (auth.signedIn) auth.signIn();
         } else if (err.code === "RATE_LIMIT")
           setError(
             "You've posted a lot this minute. Wait a moment, then try again.",
@@ -312,45 +312,20 @@ export function Composer({
 
       {!auth.signedIn && (
         <div className={styles.signin}>
-          {auth.mode === "none" ? (
-            <p>
-              Posting needs sign-in, and sign-in isn&apos;t set up on this build
-              yet. You can still read and explore.
-            </p>
-          ) : (
-            <p>
-              Sign in to post. Your public profile name appears with your post.
-              {auth.mode === "dev" && (
-                <span className={styles.devNote}>
-                  {" "}
-                  Dev sign-in works with the synthetic mock API only.
-                </span>
-              )}
-            </p>
-          )}
+          <p>Your post will be labeled Anonymous. This browser keeps your posting streak and ownership; clearing its cookies loses access.</p>
+          {auth.mode !== "none" && <button type="button" className="drift-textlink" onClick={auth.signIn}>Sign in to use your profile instead</button>}
         </div>
       )}
 
       <div className={styles.actions}>
-        {auth.signedIn ? (
           <button
             type="submit"
             className="drift-primary"
-            disabled={busy}
+            disabled={busy || !auth.ready}
             aria-busy={busy}
           >
-            {busy ? "Posting…" : "Post to the cloud"}
+            {busy ? "Posting…" : auth.signedIn ? "Post to the cloud" : "Post anonymously"}
           </button>
-        ) : (
-          <button
-            type="button"
-            className="drift-primary"
-            onClick={auth.signIn}
-            disabled={auth.mode === "none"}
-          >
-            {auth.mode === "dev" ? "Dev sign-in" : "Sign in to post"}
-          </button>
-        )}
       </div>
     </form>
   );

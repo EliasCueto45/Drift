@@ -82,13 +82,8 @@ export function CloudCreator({
       setError(problem);
       return;
     }
-    if (!auth.signedIn) {
-      setError(
-        auth.mode === "none"
-          ? "Sign-in is not configured on this build."
-          : "Sign in, then publish your outline.",
-      );
-      auth.signIn();
+    if (!auth.ready) {
+      setError("Posting session is loading. Try again in a moment.");
       return;
     }
     if (submitting.current) return;
@@ -219,6 +214,7 @@ export function CloudCreator({
           The outline is public. Keep edges from crossing; the server checks the
           shape before publishing.
         </p>
+        {!auth.signedIn && <p>Your created cloud will be labeled Anonymous. Keep this browser&apos;s cookies to manage it later.</p>}
         {error && <p role="alert">{error}</p>}
         <div className={styles.actions}>
           <button
@@ -233,7 +229,7 @@ export function CloudCreator({
             type="button"
             className="drift-primary"
             onClick={() => void publish()}
-            disabled={busy || vertices.length < 3}
+            disabled={busy || !auth.ready || vertices.length < 3}
           >
             {busy ? "Publishing…" : "Publish cloud"}
           </button>

@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
     messagesById: vi.fn(),
   },
   auth: {
+    ready: true,
     userId: "user_alice",
     signedIn: true,
     mode: "clerk",
@@ -77,6 +78,21 @@ const post = {
 } as Message;
 
 describe("connected author and cloud controls", () => {
+  it("posts anonymously without opening sign-up", async () => {
+    mocks.auth.signedIn = false;
+    mocks.auth.userId = "anon_browser";
+    mocks.api.createMessage.mockResolvedValueOnce({ data: { ...post, authorId: "anon_browser" } });
+    const onPublished = vi.fn();
+    const anchor = { longitude: -73, latitude: 42 };
+    render(createElement(Composer, {
+      item: { cloud: { id: "cloud", version: 1 }, previews: [] } as unknown as CloudWithPreviews,
+      anchor, viewer: anchor, onPublished, onCancel: vi.fn(), onStale: vi.fn(), onDraft: vi.fn(), onMoveSpot: vi.fn(),
+    }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Hello anonymously" } });
+    fireEvent.click(screen.getByRole("button", { name: "Post anonymously" }));
+    await waitFor(() => expect(onPublished).toHaveBeenCalled());
+    expect(mocks.auth.signIn).not.toHaveBeenCalled();
+  });
   it.each([
     ["lost response", new Error("offline")],
     ["expired session", new DriftApiError(401, "UNAUTHENTICATED", "Sign in again")],

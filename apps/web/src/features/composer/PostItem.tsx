@@ -42,7 +42,7 @@ export function PostItem({ message }: { message: Message; mine?: boolean }) {
           </a>
         )}
         <p className={styles.itemMeta}>
-          {owned ? "Your post" : message.author?.displayName || "Drift user"} ·{" "}
+          {owned ? message.authorId.startsWith("anon_") ? "Your anonymous post" : "Your post" : message.author?.displayName || "Drift user"} ·{" "}
           {timeAgo(message.createdAt)}
         </p>
         {owned &&
