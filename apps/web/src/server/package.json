@@ -1,0 +1,39 @@
+{
+  "name": "@drift/backend",
+  "private": true,
+  "engines": { "node": ">=22.18.0" },
+  "type": "module",
+  "scripts": {
+    "start": "node serve.mjs",
+    "config:check": "node config-check.mjs",
+    "clerk:check": "node ../../../../db/check-clerk.mjs",
+    "db:check": "node ../../../../db/check.mjs",
+    "db:prepare": "node ../../../../db/prepare.mjs",
+    "smoke:atlas": "node ../../../../db/smoke.mjs",
+    "test": "node --test test/*.test.mjs test/database.integration.mjs",
+    "test:db": "node --test test/database.integration.mjs",
+    "db:migrate": "node ../../../../db/migrate.mjs",
+    "db:seed": "node ../../../../db/seed.mjs",
+    "cleanup": "node cleanup-cli.mjs",
+    "cleanup:watch": "node cleanup-cli.mjs --watch",
+    "lint": "node check.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
+    "@clerk/backend": "^2.33.8",
+    "@clerk/nextjs": "^6.35.0",
+    "@turf/turf": "^7.4.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "mongodb": "^7.8.0",
+    "music-metadata": "^11.10.0",
+    "sharp": "^0.34.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "mongodb-memory-server": "^11.3.0",
+    "typescript": "^7.0.2"
+  }
+}
