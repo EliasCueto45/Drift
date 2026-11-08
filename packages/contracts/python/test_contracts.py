@@ -19,7 +19,7 @@ def test_every_batch_and_seed_message_validates():
     assert n >= 8
 
 
-def test_wind_cases_match_typescript():
+def test_wind_cases_match_shared_conventions():
     cases = json.loads((ROOT / "fixtures/wind-cases.json").read_text())["cases"]
     for c in cases:
         u, v = wind_to_uv(c["speedMps"], c["fromDeg"])

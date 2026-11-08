@@ -1,5 +1,9 @@
 # Owner 3 — Tracking
 
+## Python backend integration
+
+Current commands and runtime are in the root README and `db/README.md`. Worker integration launchers now use `sys.executable -m drift_tools.backend_harness` and a disposable MongoDB replica set; the shared mock and smoke tools also run in Python. Set `DRIFT_TEST_BACKEND=1` to include real API/database tests. Scientific tracking logic and canonical schema v1 payloads are unchanged by this port. Historical Node/PostGIS notes below describe earlier revisions; final browser/current-sky acceptance remains open.
+
 ## Integration with unmerged Owner 2 backend (`69f1f00`)
 
 Fetched and fast-forwarded `owner-3/tracking` to the backend branch (it already descended from our latest tracking work). Main and owner-2/backend were not modified. Added opt-in actual-backend/PostGIS worker tests and a manual current-NOAA-to-backend smoke script, all in Owner 3 paths. Fixed native JSON confidence export and NumPy checkpoint serialization after actual current imagery exposed float32 values; added a regression test.

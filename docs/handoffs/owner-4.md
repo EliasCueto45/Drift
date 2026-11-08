@@ -1,5 +1,9 @@
 # Owner 4 handoff
 
+## Python runtime integration
+
+The Python runtime decision supersedes the Node/pnpm commands below. Root tooling now uses `python -m drift_tools.cli`; the FastAPI API uses `python -m drift_api.cli`. Canonical schema v1 remains unchanged; generated TypeScript artifacts have been removed. Fixture generation is in `tools/drift_tools/fixtures_gen.py`, with scenario metadata in `scenarios.json`. Root CI installs the shared locked Python environment, starts disposable MongoDB and tests the actual worker/API integration. Remaining work: verify CI on GitHub/Linux, build the frontend, configure private media and deploy the API/worker/cleanup processes. See the root README and `db/README.md` for current commands. Older entries below record the prior bootstrap.
+
 **Milestone:** 1 (bootstrap) - contracts, fixtures, CI, smoke tooling. **Branch:** `owner-4/integration`.
 
 ## Delivered

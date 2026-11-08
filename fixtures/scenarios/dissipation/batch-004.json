@@ -72,7 +72,7 @@
   "anchorUpdates": [
     {
       "messageId": "msg_ds_1",
-      "expectedMessageVersion": 1,
+      "expectedMessageVersion": 3,
       "targetCloudId": null,
       "anchor": {
         "longitude": -73.6918,

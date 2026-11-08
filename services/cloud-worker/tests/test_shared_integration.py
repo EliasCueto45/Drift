@@ -66,22 +66,19 @@ def test_state_uses_canonical_artwork_control_points():
     assert e.parcels["art"].control_points[0] == pytest.approx((602000,4702000))
 
 
-def test_real_worker_posts_to_shared_node_mock(tmp_path, monkeypatch):
+def test_real_worker_posts_to_shared_python_mock(tmp_path, monkeypatch):
     import os
-    import shutil
+    import sys
     import socket
     import subprocess
     import time
     import urllib.request
-    node = shutil.which("node")
-    if not node:
-        pytest.skip("Node required for shared mock integration")
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
     base = f"http://127.0.0.1:{port}"
     env = dict(os.environ, PORT=str(port), TRACKING_INGEST_SECRET="integration-test-only")
-    process = subprocess.Popen([node, str(ROOT/"tools/mock-api.mjs")], cwd=ROOT, env=env,
+    process = subprocess.Popen([sys.executable, '-m', 'drift_tools.cli', 'mock'], cwd=ROOT, env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(100):
@@ -111,7 +108,7 @@ def test_real_worker_posts_to_shared_node_mock(tmp_path, monkeypatch):
                      "--state-dir", str(tmp_path/"journal")]) == 0
         assert main(["--publish", "--dataset", "cli-integration-demo",
                      "--state-dir", str(tmp_path/"journal")]) == 0
-        result = subprocess.run([node, str(ROOT/"tools/smoke.mjs")], cwd=ROOT,
+        result = subprocess.run([sys.executable, '-m', 'drift_tools.cli', 'smoke'], cwd=ROOT,
                                 env=dict(env,DRIFT_API_BASE_URL=base,SMOKE_AUTH_TOKEN="mock-user"),
                                 capture_output=True, text=True, timeout=30)
         assert result.returncode == 0, result.stdout+result.stderr
