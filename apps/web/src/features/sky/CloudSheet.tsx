@@ -302,7 +302,7 @@ export function CloudSheet({
               onClick={() => void load(scope, page.cursor)}
               disabled={page.loading}
             >
-              {page.loading ? "Loadingâ€¦" : "Show more"}
+              {page.loading ? "Loading…" : "Show more"}
             </button>
           )}
         </div>

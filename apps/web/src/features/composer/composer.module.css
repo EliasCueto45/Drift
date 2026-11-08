@@ -71,9 +71,9 @@
 }
 
 .vote[aria-pressed="true"] {
-  background: var(--accent-tint);
+  background: var(--accent);
   border-color: transparent;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .vote[data-pending] {

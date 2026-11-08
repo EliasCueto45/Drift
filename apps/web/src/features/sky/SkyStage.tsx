@@ -49,7 +49,6 @@ interface Props {
   selectedId: string | null;
   placing: boolean;
   draft: Draft | null;
-  onAim: (id: string | null) => void;
   onTap: (id: string | null) => void;
   onOpen: (id: string) => void;
   onPlace: (cloudId: string, anchor: Anchor) => void;
@@ -75,7 +74,6 @@ interface Props {
 const SETTLE_MS = 600;
 const VIRTUAL_FADE_MS = 600;
 
-const AIM_DWELL_MS = 450;
 const REGISTER_EVERY_MS = 333;
 /** Mask width in pixels; enough for cloud-scale shapes, cheap enough for a phone. */
 const MASK_W = 120;
@@ -87,7 +85,6 @@ const MIN_SKY_ELEVATION_SIN = Math.sin(4 * DEG);
 export function SkyStage(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const reticleRef = useRef<HTMLDivElement>(null);
   const propsRef = useLatest(props);
   const { created, vote } = usePosts();
   const postsRef = useLatest({ created, vote });
@@ -125,9 +122,6 @@ export function SkyStage(props: Props) {
     observer.observe(canvas);
     resize();
 
-    let aimCandidate: string | null = null;
-    let aimSince = 0;
-    let aimReported: string | null | undefined = undefined;
     let lastSummary = 0;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let lastRegister = 0;
@@ -231,22 +225,8 @@ export function SkyStage(props: Props) {
         drawVirtualClouds(ctx, layoutVirtualClouds(scene.clouds, scene.projection, { width, height }), fadeTint, fade);
       }
 
-      // Aim: what the reticle points at, with a dwell so sensor jitter doesn't flicker selection.
-      const centerId = p.placing || !p.interactive ? null : pickCloud(scene.clouds, width / 2, height / 2, null);
-      if (!p.interactive) aimReported = undefined;
-      else if (centerId !== aimCandidate) {
-        aimCandidate = centerId;
-        aimSince = now;
-      } else if (now - aimSince > (centerId ? AIM_DWELL_MS : AIM_DWELL_MS * 3) && aimReported !== centerId) {
-        aimReported = centerId;
-        p.onAim(centerId);
-      }
-      reticleRef.current?.setAttribute("data-on", centerId ? "true" : "false");
-
-      for (const c of scene.clouds) {
-        const strength = c.id === p.selectedId ? 1 : c.id === centerId ? 0.55 : 0;
-        drawFootprintGlow(ctx, c.rings, strength);
-      }
+      // No aiming: clouds are chosen by tapping them. The selected one glows.
+      for (const c of scene.clouds) if (c.id === p.selectedId) drawFootprintGlow(ctx, c.rings, 1);
 
       const votes = (id: string, fallback: number) => {
         const msg = { id, voteCount: fallback, viewerHasUpvoted: false } as Message;
@@ -284,7 +264,7 @@ export function SkyStage(props: Props) {
         p.onSummary({
           visible: scene.clouds.filter((c) => c.visible).length,
           total: scene.clouds.length,
-          aimId: centerId,
+          aimId: null,
           turn: turn ? { id: turn.id, turnDeg: turn.turnDeg } : null,
         });
       }
@@ -327,7 +307,9 @@ export function SkyStage(props: Props) {
     const scene = sceneRef.current;
     if (!scene) return;
     if (props.placing) {
-      const target = scene.clouds.find((c) => c.id === props.selectedId);
+      // Choosing where a new post goes: any cloud under the finger, at the exact tap spot.
+      const hit = pickCloud(scene.clouds, x, y, null, TAP_TOLERANCE_PX);
+      const target = hit ? scene.clouds.find((c) => c.id === hit) : undefined;
       const anchor = target ? anchorOnCloud(target, scene.projection, x, y) : null;
       if (target && anchor) props.onPlace(target.id, anchor);
       else props.onPlaceMiss();
@@ -378,7 +360,6 @@ export function SkyStage(props: Props) {
         onKeyDown={onKeyDown}
         data-placing={props.placing || undefined}
       />
-      <div ref={reticleRef} className={styles.reticle} aria-hidden="true" data-on="false" />
     </div>
   );
 }

@@ -93,12 +93,6 @@
   fill: rgba(43, 108, 176, 0.3);
 }
 
-.crosshair line {
-  stroke: #fff;
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
 .controls {
   position: absolute;
   right: calc(var(--safe-right) + 12px);
@@ -135,13 +129,4 @@
   font-weight: 700;
   font-size: var(--t-s);
   color: #fff;
-}
-
-.placeHere {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: calc(50% + 28px);
-  flex: none;
-  box-shadow: var(--shadow-2);
 }
