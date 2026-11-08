@@ -9,6 +9,7 @@
     "start": "node serve.mjs",
     "config:check": "node config-check.mjs",
     "db:check": "node ../../../../db/check.mjs",
+    "db:prepare": "node ../../../../db/prepare.mjs",
     "test": "node --test test/*.test.mjs test/database.integration.mjs",
     "test:db": "node --test test/database.integration.mjs",
     "db:migrate": "node ../../../../db/migrate.mjs",
