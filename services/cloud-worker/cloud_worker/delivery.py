@@ -16,6 +16,10 @@ class Conflict(RuntimeError):
     pass
 
 
+class TransportUnavailable(RuntimeError):
+    """Transient network/service failure; the durable journal is safe to retry."""
+
+
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         # Never forward the worker bearer credential to a redirected endpoint.
@@ -56,7 +60,7 @@ class ApiClient:
                 pass
             if attempt+1 < self.attempts:
                 time.sleep(min(2**attempt, 8))
-        raise RuntimeError("tracking API unavailable; pending batch retained for retry")
+        raise TransportUnavailable("tracking API unavailable; pending batch retained for retry")
 
     def send(self, batch):
         validate_batch(batch, self.schema)

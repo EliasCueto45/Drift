@@ -1,5 +1,23 @@
 # AR follow-up handoffs from Owner 3
 
+## Live Atlas persistence diagnosis — November 8, 2026
+
+### Posted-content coverage correction
+
+The held posts were outside the fixed 64x64 km Troy sampling crop, not outside actual cloud: reprocessing the cached 10:56 UTC NOAA mask on a wider grid found valid cloudy pixels at all three held anchors. The old mask was 100% overcast, so its unchanged outline was the rectangular crop, not evidence of stationary atmospheric material. No anchor rollback/snap or synthetic cloud creation is justified by this evidence.
+
+Live acquisition now starts with a 128x128 km Troy window (covering the phone's 50 km radius) and grows in aligned 32-cell tiles to retain a 32 km buffer around tracked message anchors. Grid growth preserves the projected CRS, resolution, coordinates, sequence, cloud identity, journal and pending batches; shifts/shrinks/reprojection are rejected. Missing previous imagery on the newly covered area uses the existing wind fallback for the transition. A 512-cell axis budget reports unavailable rather than silently dropping content or inventing clear sky. Growth is a regional MVP fix, not global coverage: follow-up regional handoffs or moving per-content windows should avoid retaining the whole journey's observation area. Persistent temporal matching remains content-only; empty clouds remain discovery objects.
+
+Regression checks cover boundary crossing and recovery without snapping, invalid grid changes, pending-journal growth, and actual FastAPI/disposable-MongoDB persistence of posts/votes across expansion and restart. Owner 1 exact request: consume refreshed anchors and reconcile locally created copies; the coverage fix does not add smooth client interpolation. Owner 4 exact request: provision regional handoffs/moving windows before claiming unlimited long-distance journeys; monitor acquisition `unavailable` and observation age.
+
+Live recovery verified against shared Atlas at sequence 13, observation 2026-11-08T11:06:18.300Z: expanded grid 128x160 cells, original cloud ID retained, all three real posts non-held/non-expired and within observation coverage. Two independent public phone-URL reads returned the same three preview IDs with live freshness. No post bodies or credentials were logged, no messages were recreated, and no database dataset/run/sequence was reset. Worker suite: 51 passed/1 opt-in skipped; the expanded actual FastAPI/disposable-MongoDB test separately passed. Canonical fixture checks and scoped Python F/E9 lint passed.
+
+Live polling recovery: a transient product-download DNS failure at 10:46 UTC stopped the supervisor after sequence 8. The worker CLI now propagates classified transport failures to the supervisor, which reports unavailable and retries on its normal polling interval while preserving the journal/outbox. API transport exhaustion is classified the same way. HTTP authentication failures, invalid batches, and unreconciled state errors still stop for operator intervention. Restart uses the same `atlas-live` journal and dataset; no resets or synthetic fallback.
+
+The reported disappearing post was persisted, active and not held in Atlas. Its anchor was 25,410.85 m from the fallback campus viewer. `GET /messages?scope=all` returned it; the 25 km sky/Nearby filter excluded it. The local created-post overlay concealed that mismatch until reload. No database repair, synthetic replacement, or message-body logging was needed.
+
+The user-requested integration fix makes the phone sky and Nearby reads use the supported 50 km radius and rejects placements beyond that same radius, both at tap time and submission time. API defaults and canonical contracts are unchanged. Owner 1 exact handoff: retain `features/sky/discovery.ts` as the shared phone range policy, verify the existing post reappears after a phone reload, and test two signed-in users on the current live tunnel. More than three posts still require opening the cloud; moving clouds/viewers can leave the radius. Owner 2 exact handoff: continue the separate caller-location transport work for server-side creation-radius enforcement; the browser guard does not replace server validation.
+
 Read [decision 0003](../decisions/0003-ar-height-and-content-tracking.md). Worker output now carries optional canonical `Cloud.altitude`; Python validators read the canonical schema directly; the Python runtime decision removes generated TS bindings. Existing `wind.altitudeM` remains available. The live supervisor defaults to content-driven tracking; replay remains compatible.
 
 ## Owner 1 — Phone camera and projection

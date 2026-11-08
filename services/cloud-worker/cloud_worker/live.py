@@ -2,6 +2,7 @@
 import argparse
 from datetime import datetime, timedelta, timezone
 import json
+import math
 from pathlib import Path
 import re
 import time
@@ -10,10 +11,42 @@ from urllib.request import urlopen
 import xml.etree.ElementTree as ET
 
 from .cli import main as worker_main
+from .delivery import TransportUnavailable
 from .models import iso
+from .state import decode
 
 UTC = timezone.utc
-GRID = {"crs":"EPSG:32618", "x0":580000, "y0":4710000, "cell_m":1000, "width":64, "height":64}
+GRID = {"crs":"EPSG:32618", "x0":548000, "y0":4678000, "cell_m":1000, "width":128, "height":128}
+
+
+def coverage_grid(state_dir, margin_m=32000, max_axis_cells=512):
+    """Keep a buffer around content; a crop edge is not a physical cloud edge.
+
+    Expand only in whole 32-cell tiles. Existing checkpoints/pending batches keep
+    their coordinate system, sequence, and geometry; no dataset reset is needed.
+    """
+    path = state_dir / "journal.json"
+    if not path.exists():
+        return dict(GRID)
+    journal = json.loads(path.read_text(encoding="utf-8"))
+    value = journal["pending"]["nextState"] if journal.get("pending") else journal["checkpoint"]
+    engine = decode(value)
+    g = engine.grid
+    # A non-Troy run retains its own grid; never silently reproject a checkpoint.
+    baseline = GRID if g.crs == GRID["crs"] and g.cell_m == GRID["cell_m"] else vars(g)
+    x0, y0 = min(g.x0, baseline["x0"]), min(g.y0, baseline["y0"])
+    x1 = max(g.x0+g.width*g.cell_m, baseline["x0"]+baseline["width"]*g.cell_m)
+    y1 = max(g.y0+g.height*g.cell_m, baseline["y0"]+baseline["height"]*g.cell_m)
+    for parcel in engine.parcels.values():
+        x0, y0 = min(x0, parcel.x-margin_m), min(y0, parcel.y-margin_m)
+        x1, y1 = max(x1, parcel.x+margin_m), max(y1, parcel.y+margin_m)
+    tile = 32*g.cell_m
+    x0 = g.x0-math.ceil((g.x0-x0)/tile)*tile
+    y0 = g.y0-math.ceil((g.y0-y0)/tile)*tile
+    width, height = math.ceil((x1-x0)/tile)*32, math.ceil((y1-y0)/tile)*32
+    if max(width, height) > max_axis_cells:
+        raise ValueError("content exceeds live coverage budget; widen/deploy regional tracking coverage")
+    return {"crs":g.crs,"x0":x0,"y0":y0,"cell_m":g.cell_m,"width":width,"height":height}
 
 
 def acquisition_time(key):
@@ -114,6 +147,7 @@ def main(argv=None):
             now = datetime.now(UTC)
             try:
                 manifest = discover(catalog,now)
+                manifest["grid"] = coverage_grid(args.state_dir)
                 path = args.state_dir/"current-manifest.json"
                 atomic_json(path,manifest)
                 command = ["--mode","live","--dataset",args.dataset,"--run-id",args.run_id,
@@ -121,12 +155,12 @@ def main(argv=None):
                            "--max-observation-age-seconds","1200","--tracking-policy",args.tracking_policy]
                 if args.publish:
                     command.append("--publish")
-                code = worker_main(command)
+                code = worker_main(command, propagate_transport_errors=True)
                 latest = acquisition_time(manifest["observations"][-1]["mask"])
                 status = {"checkedAt":iso(datetime.now(UTC)),"observationAt":iso(latest),
                           "datasetId":args.dataset,"synthetic":False,"status":"live" if code == 0 else "error",
                           "windProductAvailable": "wind" in manifest["observations"][-1]}
-            except (OSError,ValueError,ET.ParseError) as error:
+            except (OSError,ValueError,ET.ParseError,TransportUnavailable) as error:
                 code = 1
                 status = {"checkedAt":iso(datetime.now(UTC)),"datasetId":args.dataset,
                           "synthetic":False,"status":"unavailable","reason":str(error)}

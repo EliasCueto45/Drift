@@ -51,7 +51,7 @@ docs/decisions/                    reviewed architecture/contract changes
 - One upvote per user/message. Tapping again removes it. Counts are authoritative on the server; optimistic UI must reconcile or roll back. Popularity never extends content lifetime.
 - Post types: **text**, **link**, and **image**. In contract v1 these map to message kinds `text`, `song` (an allowlisted HTTPS link), and `png`. Images support positioning, scaling, rotation, and alpha transparency, are clipped to the cloud boundary, and move with local cloud motion. The v1 `audio` and `drawing` kinds are out of the MVP UI; see `docs/decisions/0002-camera-ar-pivot.md`.
 - Initial validation limits: text 2,000 characters; link URL 2,048 characters; image 5 MiB / 4,096 pixels per side. These are per-message limits.
-- Default discovery radius is 25 km; maximum query/creation radius is 50 km. A post can anchor anywhere inside an eligible visible cloud within the creation radius.
+- The phone frontend requests a 50 km discovery radius for sky previews and Nearby posts, matching its 50 km placement limit. The API default when radius is omitted remains 25 km; maximum query/creation radius is 50 km. A post can anchor anywhere inside an eligible visible cloud within the creation radius. The composer rejects farther spots, including on broad overcast clouds, so a newly posted message is eligible for nearby discovery after reload. Ranking, subsequent movement, or a change in viewer location can still move it out of previews; All in cloud remains available.
 
 ### Weather-specific behavior
 

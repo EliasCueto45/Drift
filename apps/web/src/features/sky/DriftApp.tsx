@@ -10,6 +10,7 @@ import { usePosts } from "@/features/composer/posts";
 import { CloudPanel } from "./CloudPanel";
 import { CloudSheet } from "./CloudSheet";
 import { freshnessText } from "./describe";
+import { DISCOVERY_RADIUS_M, placementInRange } from "./discovery";
 import { directionTo, groundDistanceM, ringCentroid } from "./geo";
 import { MapStage } from "./MapStage";
 import { Onboarding } from "./Onboarding";
@@ -317,6 +318,10 @@ export function DriftApp({ datasetId, initialView, debug = false }: { datasetId:
     }
   }
   function onPlace(cloudId: string, anchor: Anchor) {
+    if (!placementInRange(viewer, anchor)) {
+      notify(`Choose a spot within ${DISCOVERY_RADIUS_M / 1000} km so it appears in your nearby sky.`);
+      return;
+    }
     setPlacing(false);
     if (view === "simulated") {
       // Bring the chosen spot above the composer so the words can be watched settling in.
@@ -530,6 +535,7 @@ export function DriftApp({ datasetId, initialView, debug = false }: { datasetId:
           <Composer
             item={draftCloud}
             anchor={activeDraft.anchor}
+            viewer={viewer}
             onCancel={cancelPost}
             onPublished={onPublished}
             onStale={onStale}

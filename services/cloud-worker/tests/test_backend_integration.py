@@ -4,15 +4,18 @@ import os
 from pathlib import Path
 import sys
 import subprocess
+from datetime import timedelta
 
 import pytest
+import numpy as np
 
 from cloud_worker.delivery import ApiClient, deliver
 from cloud_worker.engine import Engine
+from cloud_worker.models import Grid, Frame
 from cloud_worker.state import Journal
 from cloud_worker.contracts import DEFAULT_SCHEMA
 from cloud_worker.wind import WindField
-from test_engine import G, frame
+from test_engine import G, T, frame
 
 
 @pytest.mark.skipif(os.getenv('DRIFT_TEST_BACKEND') != '1', reason='requires disposable MongoDB replica set')
@@ -55,10 +58,22 @@ def test_python_worker_against_backend_mongodb(tmp_path):
         assert deliver(journal,frame(15),WindField(),api)
         reunited=api.state('backend-worker-demo')
         assert len({m['cloudId'] for m in reunited['messages']})==1
-        for minute in (20,25,30):
-            assert deliver(journal,frame(minute,False),WindField(),api)
+        larger=Grid(G.crs,G.x0-8000,G.y0-8000,G.cell_m,32,32)
+        def wider_frame(minute, cloudy):
+            return Frame(T+timedelta(minutes=minute),larger,np.full(larger.shape,cloudy),
+                         np.ones(larger.shape,bool),np.full(larger.shape,2000),"synthetic-expanded-coverage")
+        assert deliver(journal,wider_frame(20,True),WindField(),api)
+        journal=Journal(tmp_path/'journal.json',Engine(G,'backend-worker-demo','run'))
+        assert journal.engine().grid == larger
+        current=api.state('backend-worker-demo')
+        expanded_cloud=next(c for c in current['clouds'] if c['status']=='active')
+        posts=api.request('GET',f"/api/v1/clouds/{expanded_cloud['id']}/messages?scope=all")['data']
+        assert {p['id'] for p in posts} == {message['id'],orphan['id']}
+        assert next(p for p in posts if p['id']==message['id'])['voteCount']==1
+        for minute in (25,30,35):
+            assert deliver(journal,wider_frame(minute,False),WindField(),api)
         assert api.state('backend-worker-demo')['messages']==[]
-        assert journal.engine().sequence == 7
+        assert journal.engine().sequence == 8
     finally:
         process.stdin.close();process.wait(timeout=30)
         process.stdout.close()
