@@ -16,6 +16,7 @@
     "db:migrate": "node ../../../../db/migrate.mjs",
     "db:seed": "node ../../../../db/seed.mjs",
     "cleanup": "node cleanup-cli.mjs",
+    "cleanup:watch": "node cleanup-cli.mjs --watch",
     "lint": "node check.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
