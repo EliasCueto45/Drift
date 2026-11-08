@@ -2,7 +2,7 @@
 
 **Leave a message. Let the sky carry it.**
 
-Drift is a location-based social sky for HackRPI 2026: In The Clouds. Text, voice notes, music links, drawings, and PNG artwork travel with clouds. People underneath discover what arrived from somewhere else. Clouds move, merge, split, and dissipate; content shares that journey.
+Drift is an augmented reality social app for HackRPI 2026: In The Clouds. It turns the sky into one huge shared sketch board. Point your phone camera at the sky, choose a real cloud, and paste a post onto it: text, a link, or an image. Anyone who looks at the sky through Drift sees the posts sitting on the same clouds they were placed on. As clouds drift, their posts travel with them and reach new people under new skies. Clouds move, merge, split, and dissipate; content shares that journey.
 
 Repository: https://github.com/EliasCueto45/Drift
 
@@ -10,7 +10,7 @@ Repository: https://github.com/EliasCueto45/Drift
 
 This is a development specification, not a working application. No app scaffold, credentials, deployment, or running services exist yet. Numeric defaults below are explicit MVP decisions. Start around Troy, New York with a regional web app and a clearly labeled, deterministic historical replay. Live observations and replay must use separate datasets and clocks.
 
-Chosen architecture: Next.js App Router + TypeScript, Clerk users, PostgreSQL/PostGIS, private S3-compatible media storage, a Python/OpenCV tracking worker, and a 2D canvas sky. The web app owns all public APIs. The worker submits authenticated lifecycle batches. Start with five-second polling. Owner 4 coordinates compatible runtime/dependency versions with the implementing owners and commits lockfiles during bootstrap.
+Chosen architecture: Next.js App Router + TypeScript as a mobile-first web app, Clerk users, PostgreSQL/PostGIS, private S3-compatible media storage, a Python/OpenCV tracking worker, and a camera AR sky view (rear camera feed plus a canvas overlay positioned from GPS, compass, and motion sensors) with a 2D sky-map fallback. The web app owns all public APIs. The worker submits authenticated lifecycle batches. Start with five-second polling. Owner 4 coordinates compatible runtime/dependency versions with the implementing owners and commits lockfiles during bootstrap.
 
 ```text
 Satellite imagery + altitude-aware winds
@@ -22,7 +22,7 @@ Satellite imagery + altitude-aware winds
  Next.js API ---- Postgres/PostGIS
       |          private media storage
       |          Clerk identity
- Sky / discovery / composer UI
+ Camera AR sky / discovery / composer UI (phone)
 ```
 
 Planned directories:
@@ -30,8 +30,8 @@ Planned directories:
 ```text
 apps/web/src/app/                  pages and API routes
 apps/web/src/server/               auth, DB, storage, lifecycle application
-apps/web/src/features/sky/         sky, projection, previews, expansion
-apps/web/src/features/composer/    posts, drawings, uploads, voting UI
+apps/web/src/features/sky/         camera AR view, sensor pose, projection, map fallback, previews, expansion
+apps/web/src/features/composer/    posts, links, image uploads, voting UI
 services/cloud-worker/            satellite/wind adapters and tracker
 packages/contracts/               JSON Schema and generated TS/Python types
 db/migrations/                    ordered SQL, including PostGIS
@@ -42,14 +42,17 @@ docs/decisions/                    reviewed architecture/contract changes
 
 ## Required experience
 
-- Anonymous users can browse. Clerk sign-in is required to post, draw, upload, create clouds, or vote. Display authors by public profile, never email or GPS history.
-- Single tap selects a cloud and shows up to three nearby message previews. Double tap expands it to see other messages. Provide an **Open cloud** button and keyboard activation for the same action.
+- **Look through the camera.** The main screen is the phone's rear camera feed with tracked clouds, their outlines, and their posts drawn over the real sky. Users pan the phone around the sky to discover posts.
+- **Aim to choose a cloud.** A center reticle highlights the cloud it points at; tapping a cloud on screen does the same. Selecting shows up to three nearby post previews. Double tap or the **Open cloud** button expands it to see other posts.
+- **Paste a post.** While aiming at a selected cloud, the user taps the spot to place a post there, writes it, previews it on the cloud, and publishes. The tapped spot becomes the post's geographic anchor on that cloud; do not snap to a centroid. Warn at composition that the anchor is publicly discoverable.
+- **Everyone sees the same placement.** Posts render on the same cloud and spot for every viewer, seen from each viewer's own position and direction. As the cloud drifts, its posts move with it and become visible to people under its new position.
+- **Map fallback.** When the camera or motion sensors are unavailable or denied (desktop, permission refused, unsupported browser), show the same clouds and posts on a 2D sky map with the same select, open, and post actions. Keyboard activation works in this view.
+- Anonymous users can browse. Clerk sign-in is required to post, upload, create clouds, or vote. Display authors by public profile, never email or GPS history.
 - Filter previews by proximity first, then sort by upvotes descending, creation time descending, ID ascending. Expanded view defaults to a paginated **Nearby** tab; an explicit **All in cloud** tab exposes the rest. No limit on total messages per cloud; paginate responses.
 - One upvote per user/message. Tapping again removes it. Counts are authoritative on the server; optimistic UI must reconcile or roll back. Popularity never extends content lifetime.
-- Message types: `text`, `audio`, `song`, `drawing`, `png`. Artwork is attached to the cloud and appears as an upvotable message in the expanded view. Audio requires explicit playback; songs remain links.
-- Freehand drawing directly on a cloud stores editable strokes in normalized local coordinates and a transparent PNG rendering. PNG uploads support positioning, scaling, rotation, and alpha transparency. Clip artwork to the cloud boundary. Transport its anchor/control points with local cloud motion.
-- Initial validation limits: text 2,000 characters; song URL 2,048 characters; audio 60 seconds / 10 MiB; PNG 5 MiB / 4,096 pixels per side; drawing 10,000 points. These are per-message limits.
-- Default discovery radius is 25 km; maximum query/creation radius is 50 km. A post can anchor anywhere inside an eligible visible cloud within the creation radius. Do not snap anchors to a cloud centroid.
+- Post types: **text**, **link**, and **image**. In contract v1 these map to message kinds `text`, `song` (an allowlisted HTTPS link), and `png`. Images support positioning, scaling, rotation, and alpha transparency, are clipped to the cloud boundary, and move with local cloud motion. The v1 `audio` and `drawing` kinds are out of the MVP UI; see `docs/decisions/0002-camera-ar-pivot.md`.
+- Initial validation limits: text 2,000 characters; link URL 2,048 characters; image 5 MiB / 4,096 pixels per side. These are per-message limits.
+- Default discovery radius is 25 km; maximum query/creation radius is 50 km. A post can anchor anywhere inside an eligible visible cloud within the creation radius.
 
 ### Weather-specific behavior
 
@@ -57,7 +60,7 @@ docs/decisions/                    reviewed architecture/contract changes
 | --- | --- |
 | Scattered clouds | Attach notes anywhere within visible eligible footprints; move anchors with local motion. |
 | Full overcast | Allow posting anywhere on the visible cover, including far from its centroid. Retain distinct geographic anchors; changing its bounding box must not rescale all notes. |
-| Clear sky | Offer **Draw a cloud**: trace a closed outline, preview, then publish a user-created cloud. |
+| Clear sky | Offer **Draw a cloud**: trace a closed outline on the camera view (or map fallback), preview, then publish a user-created cloud. |
 | Created cloud | Label **Created cloud**, show creator, advect with wind, expire 24 hours after creation. All message types work on it. |
 | Rain/storm | Change visual styling; retain posting/media behavior. Rain alone does not delete notes. |
 | Night | Use appropriate infrared/cloud-mask data; visible-image darkness is not disappearance. |
@@ -65,7 +68,18 @@ docs/decisions/                    reviewed architecture/contract changes
 
 Created clouds are independent synthetic objects: they never automatically merge with observed clouds or each other. Overlapping layers must be selectable. Use an assumed altitude of 2 km, labeled as estimated. Creator deletion expires its contents; editing its published outline is outside the MVP. Anyone signed in can post to it.
 
-A created outline is a simple geographic polygon with 3–256 distinct vertices, no self-intersections, and maximum diameter 10 km. Store geographic geometry, not screen pixels. Drawing a cloud is distinct from uploading PNG artwork. Use a deterministic invertible sky-map projection for placement; camera AR alignment is outside scope. Satellite tracking identifies estimated regions from above, not guaranteed individual clouds visible from the ground.
+A created outline is a simple geographic polygon with 3–256 distinct vertices, no self-intersections, and maximum diameter 10 km. Store geographic geometry, not screen pixels. Drawing a cloud is distinct from uploading image posts. Satellite tracking identifies estimated regions from above, not guaranteed individual clouds visible from the ground.
+
+## Camera AR view
+
+The AR view places tracked clouds over the live camera image. It is a geometric overlay driven by phone sensors, not image recognition of clouds in the camera feed.
+
+1. **Camera pose.** Read the viewer's position from geolocation, heading from the compass, and tilt/roll from device orientation sensors. Combine them into a camera pose (position, azimuth from true north, elevation, roll) and smooth sensor noise. Correct magnetic heading to true north.
+2. **Place clouds in the sky.** Treat each cloud as geometry at its estimated altitude (`wind.altitudeM`, or 2 km assumed for created clouds). For each cloud vertex and post anchor, compute azimuth and elevation from the viewer, then map those angles to screen pixels with the camera's field of view. The inverse maps a screen tap back to a geographic anchor on the cloud plane at that altitude. Both directions live in the single `SkyProjection` implementation.
+3. **Visibility.** Only draw clouds above the horizon and inside the discovery radius. Far clouds sit low on the horizon; label them so users know they are distant.
+4. **Honest alignment.** Overlays are approximate: compass error is often 5–15°, and satellite regions may not match the exact cloud seen from the ground. Show a light alignment hint (for example "Estimated position") and let users nudge their heading calibration. Never claim exact cloud matching.
+5. **Permissions and platforms.** Camera access needs HTTPS and an explicit prompt. iOS Safari requires a user gesture to grant motion/orientation access. Ask for camera, location, and motion permissions in context, explain why, and fall back to the 2D map when any is denied. Video stays on the device; never upload or record camera frames.
+6. **Testing without real clouds.** Support a simulated pose (manual location and heading) so fixture clouds around Troy can be viewed in AR from anywhere, labeled as simulated.
 
 ## Wind-assisted satellite tracking
 
@@ -139,7 +153,7 @@ Assign names to Owners 1–4 at kickoff. Each person uses a separate clone/workt
 
 | Owner | Owned paths | Required outputs |
 | --- | --- | --- |
-| **1: Frontend** | UI layouts/pages, `features/sky/`, `features/composer/`, frontend styles/components | Entire frontend: sky/projection, weather, previews/expansion, drawing, media composer, voting UI, Clerk screens/client provider. |
+| **1: Frontend** | UI layouts/pages, `features/sky/`, `features/composer/`, frontend styles/components | Entire frontend: camera AR view, sensor pose and projection, 2D map fallback, weather, previews/expansion, post composer (text/link/image), voting UI, Clerk screens/client provider. |
 | **2: Backend** | `apps/web/src/app/api/`, `apps/web/src/server/`, `db/` | APIs, database/migrations, server-side Clerk verification, authorization, votes, storage, tracking ingestion, expiry and cleanup. |
 | **3: Tracking** | `services/cloud-worker/`, atmospheric fixture inputs | Satellite/wind adapters, navigation, fusion, lineage, local advection, expiry proposals, replay, Python tests. |
 | **4: Integration** | Root tooling, `packages/contracts/`, shared fixture infrastructure, CI, end-to-end tests, deployment configuration | Bootstrap coordination, generated types, shared API client, local setup, integration checks, deployment and final merges. |
@@ -151,10 +165,20 @@ Frontend ownership means design and integration accountability, not exclusive au
 Stabilize these component boundaries at kickoff, using generated contract types:
 
 ```ts
+type CameraPose = {
+  longitude: number; latitude: number;
+  azimuthDeg: number;   // clockwise from true north
+  elevationDeg: number; // above the horizon
+  rollDeg: number;
+  horizontalFovDeg: number;
+  source: 'sensors' | 'simulated';
+};
 type SkyProjection = {
   // CSS pixels relative to canvas, never device pixels.
-  screenToGeo(p: {x:number;y:number}): {longitude:number;latitude:number};
-  geoToScreen(p: {longitude:number;latitude:number}): {x:number;y:number};
+  // Built from a CameraPose in AR, or from a map viewport in the fallback.
+  // altitudeM is the cloud's estimated altitude; geoToScreen returns null when off screen.
+  screenToGeo(p: {x:number;y:number}, altitudeM: number): {longitude:number;latitude:number} | null;
+  geoToScreen(p: {longitude:number;latitude:number}, altitudeM: number): {x:number;y:number} | null;
 };
 // SkyView emits onCloudOpen(cloudId) and onPlace(cloudId, anchor).
 // Composer: {cloudId, anchor, projection, onSaved, onCancel}.
@@ -165,7 +189,7 @@ type SkyProjection = {
 ### Milestones
 
 1. **Bootstrap together, Owner 4 coordinates.** Owner 4 sets up root tooling, contracts/generated bindings, shared API client, fixture infrastructure and CI. Owner 1 scaffolds the frontend; Owner 2 supplies server/API scaffolding, PostGIS/storage and migrations; Owner 3 scaffolds the worker and atmospheric fixtures. Owner 4 assembles Compose, environment templates and deterministic scattered/overcast/clear/merge/split/dissipation/outage/created-cloud scenarios. All four owners review contracts and run the same fixture before branching.
-2. **First integrated slice.** Clerk sign-in → select fixture cloud → post text → read from second browser → vote → preview reorders → double tap expands. Merge this against the actual API/database before adding all media modes. Demo bypasses satellite acquisition, never authentication.
+2. **First integrated slice.** Clerk sign-in → aim the camera (or simulated pose) at a fixture cloud → post text → see it on the same cloud from a second phone/browser → vote → preview reorders → double tap expands. Merge this against the actual API/database before adding all media modes. Demo bypasses satellite acquisition, never authentication.
 3. **Parallel features.** Owner 1 completes sky/discovery, artwork and created-cloud UI; Owner 2 completes APIs, authorization, persistence, expiry and cleanup; Owner 3 connects real tracking batches; Owner 4 maintains contract fixtures, verifies end-to-end behavior and resolves integration gaps with the responsible owners. Merge small complete slices frequently.
 4. **Final connection, Owner 4 leads.** Substitute worker output for fixture batches through the same API. Exercise drawings, lifecycle, concurrency and media on shared persistence. Rehearse a labeled historical replay. Live acquisition is a separate smoke check.
 5. **Release gate.** Clean-clone setup and acceptance checks pass; update setup to actual tested commands; Owner 4 coordinates final review with affected owners, deployment and the final PR, recording remaining limitations. No hidden mock fallback.
@@ -220,7 +244,10 @@ Required bootstrap checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm bui
 - [ ] Two users post and vote/unvote; retries do not inflate counts; anonymous reads work, forged identities and unauthorized mutations fail.
 - [ ] Nearby filtering precedes vote ranking; previews show the highest-ranked eligible messages; double tap/button expands paginated Nearby and All tabs.
 - [ ] Clear-day cloud drawing creates a labeled object with wind movement and 24-hour expiry. Overlap never silently merges it with real clouds.
-- [ ] Freehand art and transparent PNGs preserve placement, clipping and motion; malformed/oversized uploads fail.
+- [ ] On a phone, the camera view shows fixture clouds and their posts in the expected direction; aiming at a cloud selects it and tapping places a post there.
+- [ ] A post placed by one user appears on the same cloud for a second user viewing from a different location, and moves with the cloud.
+- [ ] Denying camera, location, or motion permission falls back to the 2D map with the same actions; camera frames are never uploaded.
+- [ ] Transparent image posts preserve placement, clipping and motion; malformed/oversized uploads fail.
 - [ ] Two distant notes under overcast remain distinct during local advection and changing cloud boundaries.
 - [ ] Wind from west at 10 m/s moves approximately 6 km east in 10 minutes before image correction; test units, timestamps, altitude selection and vector conventions.
 - [ ] Wind/image disagreement lowers confidence; missing imagery never deletes content; prediction freezes after its horizon.
