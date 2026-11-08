@@ -82,7 +82,21 @@
         "creatorId": { "type": ["string", "null"] },
         "expiresAt": { "oneOf": [{ "$ref": "#/$defs/Timestamp" }, { "type": "null" }] },
         "datasetId": { "$ref": "#/$defs/Id" },
-        "trackingRunId": { "$ref": "#/$defs/Id" }
+        "trackingRunId": { "$ref": "#/$defs/Id" },
+        "altitude": {
+          "type": "object",
+          "description": "Optional AR height provenance. Existing wind.altitudeM remains the numerical cloud-plane estimate.",
+          "required": ["meters", "reference", "source", "estimated", "measuredFraction", "parallaxCorrected"],
+          "additionalProperties": false,
+          "properties": {
+            "meters": { "type": "number", "minimum": 0, "maximum": 25000 },
+            "reference": { "enum": ["unknown", "mean_sea_level", "wgs84_ellipsoid"] },
+            "source": { "type": "string" },
+            "estimated": { "type": "boolean" },
+            "measuredFraction": { "type": "number", "minimum": 0, "maximum": 1 },
+            "parallaxCorrected": { "type": "boolean" }
+          }
+        }
       },
       "if": { "properties": { "kind": { "const": "created" } }, "required": ["kind"] },
       "then": {

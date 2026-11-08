@@ -1,7 +1,7 @@
 """Manual online check: current NOAA -> Python API -> disposable MongoDB.
 
 Run from repo root after installing backend dependencies. This is not a deployed
-Postgres/Clerk/S3 check. Uses an isolated disposable backend and new worker state.
+hosted Atlas/Clerk/S3 check. Uses an isolated disposable backend and new worker state.
 """
 import json
 import os

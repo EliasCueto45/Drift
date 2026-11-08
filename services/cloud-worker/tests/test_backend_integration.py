@@ -28,6 +28,7 @@ def test_python_worker_against_backend_mongodb(tmp_path):
         api=ApiClient(base,'backend-test-only',json.loads(DEFAULT_SCHEMA.read_text()))
         api.tracking_run_id='run'
         journal=Journal(tmp_path/'journal.json',Engine(G,'backend-worker-demo','run'))
+        journal.value['checkpoint']['contentOnly']=True
         assert deliver(journal,frame(0),WindField(),api)
         state=api.state('backend-worker-demo')
         cloud=state['clouds'][0]

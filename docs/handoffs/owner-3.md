@@ -1,5 +1,11 @@
 # Owner 3 — Tracking
 
+## Python backend compatibility review
+
+Pulled main fb7d00c (FastAPI + synchronous PyMongo) into the AR tracking branch. Kept Python harness/mock launchers and removed obsolete Node harness/generated TS binding during merge resolution. The optional canonical Cloud.altitude field, content-driven policy, parallax guard and datum helpers remain unchanged; see owner-3-ar.md and decision 0003-ar-height-and-content-tracking.md. The root Python runtime decision supersedes TS-generation instructions. Real database/worker integration tests must run against the Python API before claiming compatibility. Existing env names are MONGODB_URI and MONGODB_DB; Atlas Connect Drivers should select Python / PyMongo (Synchronous), not a framework-specific adapter.
+
+Compatibility verification completed: 88 combined backend, canonical-contract and worker tests pass with DRIFT_TEST_BACKEND=1 and warnings treated as errors. Python contract/fixture checks, Ruff and mypy pass. This includes content-driven tracking and optional altitude metadata through the actual FastAPI handlers and disposable MongoDB transactions. No scientific tracking rewrite or environment-key migration was required. Hosted media and real-phone AR calibration are still separate acceptance checks.
+
 ## Python backend integration
 
 Current commands and runtime are in the root README and `db/README.md`. Worker integration launchers now use `sys.executable -m drift_tools.backend_harness` and a disposable MongoDB replica set; the shared mock and smoke tools also run in Python. Set `DRIFT_TEST_BACKEND=1` to include real API/database tests. Scientific tracking logic and canonical schema v1 payloads are unchanged by this port. Historical Node/PostGIS notes below describe earlier revisions; final browser/current-sky acceptance remains open.

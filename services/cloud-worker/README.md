@@ -1,5 +1,9 @@
 # Drift cloud worker — Owner 3
 
+## AR additions retained across the Python API migration
+
+Optional canonical `Cloud.altitude` carries height reference/source/estimated fraction and parallax status; `wind.altitudeM` remains compatible. Content-driven live tracking still uses the same v1 state/ingest endpoints through FastAPI. Camera projection/viewer elevation and fixed-orientation rendering remain frontend work. See [the AR handoffs](../../docs/handoffs/owner-3-ar.md) and [the height/tracking decision](../../docs/decisions/0003-ar-height-and-content-tracking.md). Python validators now read JSON Schema directly; generated TypeScript artifacts are intentionally removed.
+
 Wind-assisted regional cloud tracking, local message/artwork advection, lineage, lifecycle evidence, durable delivery and replay. The service integrates with the Python FastAPI backend and MongoDB replica-set transactions; deployed services and browser verification remain separate acceptance checks. Offline output uses the shared Python validator; publishing uses the same canonical batch schema. Backend state/ack requirements are in [the integration proposal](../../docs/decisions/owner-3-tracking-integration.md).
 
 ## Actual backend integration checks

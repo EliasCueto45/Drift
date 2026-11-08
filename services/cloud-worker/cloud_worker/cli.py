@@ -55,6 +55,7 @@ def main(argv=None):
     parser.add_argument("--publish", action="store_true")
     parser.add_argument("--max-observation-age-seconds", type=int)
     parser.add_argument("--batch-schema", type=Path)
+    parser.add_argument('--tracking-policy',choices=('all','content'),default='all')
     args = parser.parse_args(argv)
     try:
         if args.mode == "live" and (not args.manifest or args.fixture):
@@ -89,6 +90,8 @@ def main(argv=None):
                 sink = JsonlSink(args.output, schema)
                 bind_destination(args.state_dir, {"file": str(args.output.resolve())})
             flush(journal, sink)
+            # Already-staged batches are acknowledged unchanged before policy switches.
+            journal.value['checkpoint']['contentOnly']=args.tracking_policy=='content'
             inputs = observation_inputs(args.manifest, args.state_dir/"cache") if args.manifest else synthetic_inputs(fixture)
             count = 0
             for frame, winds in inputs:

@@ -97,6 +97,7 @@ def main(argv=None):
     parser.add_argument("--output",type=Path,default=Path("services/cloud-worker/out/current-sky.jsonl"))
     parser.add_argument("--publish",action="store_true")
     parser.add_argument("--once",action="store_true")
+    parser.add_argument('--tracking-policy',choices=('all','content'),default='content')
     parser.add_argument("--poll-seconds",type=int,default=300)
     args = parser.parse_args(argv)
     if args.dataset.endswith("-demo") or args.dataset.startswith("fx-") or args.poll_seconds < 60:
@@ -117,7 +118,7 @@ def main(argv=None):
                 atomic_json(path,manifest)
                 command = ["--mode","live","--dataset",args.dataset,"--run-id",args.run_id,
                            "--manifest",str(path),"--state-dir",str(args.state_dir),"--output",str(args.output),
-                           "--max-observation-age-seconds","1200"]
+                           "--max-observation-age-seconds","1200","--tracking-policy",args.tracking_policy]
                 if args.publish:
                     command.append("--publish")
                 code = worker_main(command)
