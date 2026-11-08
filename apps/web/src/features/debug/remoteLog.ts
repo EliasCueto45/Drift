@@ -41,10 +41,27 @@ function flush(beacon = false) {
   void fetch("/dev/log", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => undefined);
 }
 
+let installed = false;
+
+/** Switching back to user mode stops sending; the console hooks stay but no-op. */
+export function stopRemoteLog() {
+  started = false;
+  queue = [];
+}
+
 export function startRemoteLog() {
   if (started || process.env.NODE_ENV === "production") return;
   started = true;
   session = Math.random().toString(36).slice(2, 8);
+  remoteLog("hello", {
+    ua: navigator.userAgent,
+    viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio },
+    screen: { w: screen.width, h: screen.height, angle: screen.orientation?.angle ?? null },
+    secure: window.isSecureContext,
+    url: location.href,
+  });
+  if (installed) return;
+  installed = true;
 
   for (const level of ["log", "info", "warn", "error"] as const) {
     const original = console[level].bind(console);
@@ -61,12 +78,5 @@ export function startRemoteLog() {
   });
   window.addEventListener("pagehide", () => flush(true));
 
-  remoteLog("hello", {
-    ua: navigator.userAgent,
-    viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio },
-    screen: { w: screen.width, h: screen.height, angle: screen.orientation?.angle ?? null },
-    secure: window.isSecureContext,
-    url: location.href,
-  });
   window.setInterval(() => flush(), 1000);
 }

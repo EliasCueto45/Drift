@@ -45,25 +45,41 @@ import {
   type SceneSummary,
 } from "./SkyStage";
 import { useSky } from "./useSky";
+import { outdoorScore, sunElevationDeg, VisibilityTracker, type CloudVisibility } from "./visibility";
+import { classifyFrame, loadSceneModel, type SceneResult } from "./sceneClassifier";
 import { useLatest, useMediaQuery } from "@/lib/useLatest";
 import { DebugHud, type DebugSnapshot } from "@/features/debug/DebugHud";
-import { remoteLog, startRemoteLog } from "@/features/debug/remoteLog";
+import { setDeveloperMode, useDeveloperMode } from "@/features/debug/mode";
+import { remoteLog, startRemoteLog, stopRemoteLog } from "@/features/debug/remoteLog";
 import styles from "./sky.module.css";
 
 type View = "welcome" | "camera" | "simulated" | "map";
 
-export function DriftApp({
-  datasetId,
-  initialView,
-  debug = false,
-}: {
-  datasetId: string;
-  initialView: View | null;
-  debug?: boolean;
-}) {
+export function DriftApp({ datasetId, initialView, devParam = null }: { datasetId: string; initialView: View | null; devParam?: boolean | null }) {
+  // User mode hides every debugging aid; developer mode is switched on by ?debug=1 or by
+  // tapping the status pill five times, and off with the Developer chip or ?debug=0.
   useEffect(() => {
-    if (debug) startRemoteLog();
+    if (devParam !== null) setDeveloperMode(devParam);
+  }, [devParam]);
+  const debug = useDeveloperMode();
+  useEffect(() => {
+    if (debug) {
+      startRemoteLog();
+      // Developer console hook: `await __driftSceneModel()` loads the scene classifier.
+      (window as unknown as { __driftSceneModel?: typeof loadSceneModel }).__driftSceneModel = loadSceneModel;
+    }
+    else stopRemoteLog();
   }, [debug]);
+  const devTaps = useRef<number[]>([]);
+  function onStatusTap(e: React.MouseEvent) {
+    const now = e.timeStamp;
+    devTaps.current = [...devTaps.current.filter((t) => now - t < 2000), now];
+    if (devTaps.current.length >= 5 && !debug) {
+      devTaps.current = [];
+      setDeveloperMode(true);
+      notify("Developer mode on.");
+    }
+  }
   const api = useApi();
   const auth = useDriftAuth();
   const { notice, notify, addCreated, removed, removedClouds } = usePosts();
@@ -257,6 +273,58 @@ export function DriftApp({
     setMatched(g.matchedAt > 0 && now - g.matchedAt < 5000);
   }, []);
 
+  // ---- Can real clouds be seen? (night / indoors -> virtual clouds, no matching) ----
+  // On-device scene classifier (sceneClassifier.ts): indoor vs. outdoor from the camera frame.
+  const sceneRef = useRef<{ result: SceneResult; at: number } | null>(null);
+  const [tracker] = useState(() => new VisibilityTracker());
+  const [visibility, setVisibility] = useState<CloudVisibility>({ state: "visible", reason: null });
+  const [visOverride, setVisOverride] = useState<"auto" | "visible" | "hidden">("auto");
+  const sunRef = useRef(0);
+  const [isNight, setIsNight] = useState(false);
+  const sensed = useLatest({ viewer });
+  useEffect(() => {
+    // At night clouds are hidden regardless, so the model isn't loaded or run.
+    if (view !== "camera" || isNight) return;
+    let busy = false;
+    const id = window.setInterval(() => {
+      const video = document.querySelector("video");
+      if (busy || !video || document.visibilityState !== "visible") return;
+      busy = true;
+      classifyFrame(video, { width: window.innerWidth, height: window.innerHeight })
+        .then((result) => {
+          if (result) sceneRef.current = { result, at: performance.now() };
+        })
+        .catch((error: unknown) => console.warn("Scene classification failed", error))
+        .finally(() => (busy = false));
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [view, isNight]);
+  useEffect(() => {
+    if (view !== "camera") return;
+    const tick = () => {
+      const { viewer: v } = sensed.current;
+      const sun = sunElevationDeg(new Date(), v.latitude, v.longitude);
+      sunRef.current = sun;
+      setIsNight(sun < -6);
+      const scene = sceneRef.current;
+      // Only a recent classification counts (the phone may have moved since).
+      const score = outdoorScore(scene && performance.now() - scene.at < 6000 ? scene.result.pIndoor : null);
+      const next = tracker.update(performance.now(), sun, score);
+      setVisibility((prev) => (prev.state === next.state && prev.reason === next.reason ? prev : next));
+    };
+    tick();
+    const id = window.setInterval(tick, 500);
+    return () => window.clearInterval(id);
+  }, [view, sensed, tracker]);
+  // Developer mode can force either state (e.g. to see real-cloud matching code paths at night).
+  const effectiveVis: CloudVisibility =
+    !debug || visOverride === "auto"
+      ? visibility
+      : visOverride === "visible"
+        ? { state: "visible", reason: null }
+        : { state: "hidden", reason: visibility.reason ?? (isNight ? "night" : "indoors") };
+  const cloudsHidden = view === "camera" && effectiveVis.state === "hidden";
+
   // Plain function: SkyStage reads the latest one through a ref each frame.
   const getCameraPose = (): Omit<CameraPose, "hfovDeg"> | null => {
     const vectors = orientation.reading.current.vectors;
@@ -360,14 +428,17 @@ export function DriftApp({
         ? `${settings.width}x${settings.height} ${settings.facingMode ?? ""} ${settings.frameRate ? Math.round(settings.frameRate) + "fps" : ""}`
         : null,
       viewport: `${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio}`,
-      hfov: visibleHfovDeg(
-        { width: window.innerWidth, height: window.innerHeight },
-        vw ? { width: vw, height: vh } : null,
-      ),
-      sky: `${d.skyStatus} Â· ${d.clouds} clouds Â· ${d.summary?.visible ?? 0} in view`,
-      reg: g.last
-        ? `${g.last.state}${g.last.accepted ? " +" : ""} ${Math.round(g.last.ms)}ms`
-        : null,
+      hfov: visibleHfovDeg({ width: window.innerWidth, height: window.innerHeight }, vw ? { width: vw, height: vh } : null),
+      sky: `${d.skyStatus} · ${d.clouds} clouds · ${d.summary?.visible ?? 0} in view`,
+      clouds: `${effectiveVis.state}${effectiveVis.reason ? " (" + effectiveVis.reason + ")" : ""}${visOverride !== "auto" ? " [forced]" : ""}`,
+      sunEl: sunRef.current,
+      outdoor: tracker.score,
+      scene: sceneRef.current
+        ? `wasm ${Math.round(sceneRef.current.result.ms)}ms · indoor ${sceneRef.current.result.pIndoor.toFixed(2)} · ${sceneRef.current.result.top.map((t) => `${t.name} ${t.p.toFixed(2)}`).join(", ")}`
+        : isNight
+          ? "off (night)"
+          : "loading…",
+      reg: g.last ? `${g.last.state}${g.last.accepted ? " +" : ""} ${Math.round(g.last.ms)}ms` : null,
       regFix: `az ${g.az.toFixed(1)} el ${g.el.toFixed(1)}`,
       regScore:
         g.last?.score != null
@@ -631,6 +702,7 @@ export function DriftApp({
           interactive={view !== "welcome"}
           settle={settle}
           onRegister={view === "camera" ? onRegister : undefined}
+          virtualClouds={cloudsHidden ? (effectiveVis.reason === "night" ? "night" : "day") : "off"}
           debug={debug}
         />
       )}
@@ -651,12 +723,29 @@ export function DriftApp({
 
       <header className={styles.topbar}>
         <div className={styles.pills}>
-          <span className={styles.pill} data-tone={fresh.tone} role="status">
+          {/* Five quick taps switch on developer mode (hidden from users on purpose). */}
+          <span className={styles.pill} data-tone={fresh.tone} role="status" onClick={onStatusTap}>
             <span className={styles.dot} aria-hidden="true" />
             {fresh.label}
           </span>
-          {view === "simulated" && (
-            <span className={styles.pill}>Simulated view</span>
+          {view === "simulated" && <span className={styles.pill}>Simulated view</span>}
+          {cloudsHidden && (
+            <span className={styles.pill}>{effectiveVis.reason === "night" ? "Night" : "Indoors"} · clouds shown where they are</span>
+          )}
+          {debug && view === "camera" && (
+            <button
+              type="button"
+              className={styles.signInButton}
+              onClick={() => setVisOverride((o) => (o === "auto" ? "visible" : o === "visible" ? "hidden" : "auto"))}
+              aria-label="Developer: force cloud visibility"
+            >
+              Clouds: {visOverride}
+            </button>
+          )}
+          {debug && (
+            <button type="button" className={styles.signInButton} onClick={() => setDeveloperMode(false)} aria-label="Developer mode is on. Switch to user mode">
+              Developer
+            </button>
           )}
           {view === "camera" && (
             <button
@@ -666,7 +755,7 @@ export function DriftApp({
               aria-pressed={calibrating}
             >
               <Compass size={16} aria-hidden="true" />
-              {matched
+              {matched && !cloudsHidden
                 ? "Matched to visible clouds"
                 : declination === null
                   ? "Compass uncorrected"
@@ -709,27 +798,20 @@ export function DriftApp({
           reason={reason}
           onLookUp={lookUp}
           onMap={() => setView("map")}
-          onSimulated={() => setView("simulated")}
+          onSimulated={debug ? () => setView("simulated") : undefined}
         />
       )}
 
       {view !== "welcome" && !showPanel && !composing && (
         <div className={styles.bottomDock}>
           {view === "map" ? (
-            <button
-              type="button"
-              className={styles.roundButton}
-              onClick={() => (handheld ? void lookUp() : setView("simulated"))}
-              aria-label={
-                handheld ? "Back to the camera sky" : "Simulated sky view"
-              }
-            >
-              {handheld ? (
-                <Camera size={20} aria-hidden="true" />
-              ) : (
-                <Orbit size={20} aria-hidden="true" />
-              )}
+            !handheld && !debug ? (
+              <span />
+            ) : (
+            <button type="button" className={styles.roundButton} onClick={() => (handheld ? void lookUp() : setView("simulated"))} aria-label={handheld ? "Back to the camera sky" : "Simulated sky view"}>
+              {handheld ? <Camera size={20} aria-hidden="true" /> : <Orbit size={20} aria-hidden="true" />}
             </button>
+            )
           ) : (
             <button
               type="button"
@@ -798,6 +880,8 @@ export function DriftApp({
       )}
 
       {debug && <DebugHud snapshot={debugSnapshot} />}
+      {/* User mode: hide the Next.js dev error overlay and issue badge (dev server only). */}
+      {!debug && <style>{"nextjs-portal{display:none!important}"}</style>}
 
       {/* Portrait only: the camera view's alignment and layout assume an upright phone. */}
       <div className={styles.rotate} role="alert">

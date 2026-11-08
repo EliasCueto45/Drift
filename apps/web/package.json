@@ -4,6 +4,7 @@
   "private": true,
   "description": "Drift camera AR sky + map fallback (Owner 1). Node is frontend tooling only; the API is Python.",
   "scripts": {
+    "predev": "node scripts/copy-ort-wasm.mjs",
     "dev": "next dev --port 3001",
     "dev:https": "next dev --port 3001 --experimental-https",
     "build": "next build",
@@ -12,12 +13,15 @@
     "lint": "eslint .",
     "test": "vitest run",
     "contracts:gen": "node scripts/gen-contract-types.mjs",
-    "contracts:check": "node scripts/gen-contract-types.mjs --check"
+    "contracts:check": "node scripts/gen-contract-types.mjs --check",
+    "predev:https": "node scripts/copy-ort-wasm.mjs",
+    "prebuild": "node scripts/copy-ort-wasm.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "7.9.25",
     "lucide-react": "1.70.0",
     "next": "16.4.5",
+    "onnxruntime-web": "1.31.1",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

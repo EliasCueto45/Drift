@@ -40,3 +40,8 @@ npm run typecheck && npm run lint && npm test && npm run contracts:check
 Draw a cloud opens a geographic outline editor from camera, simulated or map views. Tap outline points or pan with arrow keys and add a point at the crosshair; publishing closes the ring and validates it on the API. It targets the dataset currently displayed. Created-cloud deletion and post deletion show confirmation and are available to the current creator/author; the server enforces ownership.
 
 The composer retains its request/key when a response is lost, including the original cloud version. Editing or receiving a definite rejection starts a new attempt. The API keeps transactional receipts for 24 hours without copying post bodies. Posts show public author names with a neutral fallback for older profiles. Polling revalidates local posts and loaded rows, preserving moved anchors and removing held/expired/deleted entries; the shared 50 km discovery policy remains in effect. Account changes clear local post/vote state. Read `docs/decisions/0004-connected-cloud-post-flows.md` for the additive contract fields and retry semantics.
+
+## Third-party assets
+
+- Indoor/outdoor scene model: Places365 ResNet18 (MIT CSAIL, CC BY), int8, run on the device with onnxruntime-web. Camera frames never leave the phone. Credits and build steps: `public/models/CREDITS.md`, `scripts/build_scene_model.py`. `npm run dev`/`build` copy the onnxruntime WASM into `public/ort/` (gitignored).
+- Virtual cloud photos (CC0 / public domain): `public/clouds/CREDITS.md`, built with `scripts/make_cloud_sprites.py`.
