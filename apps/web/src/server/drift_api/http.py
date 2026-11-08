@@ -14,7 +14,8 @@ from .discovery import cloud_detail, message_page, sky
 from .mutations import create_cloud, create_message, delete_cloud, delete_message, upvote
 from .storage import artwork, complete_asset, playback_url, upload_url
 from .tracking import ingest, tracking_state
-from .validation import ApiError, fail, require
+from .validation import ApiError, fail, require, validate
+from .idempotency import create_once
 
 
 async def read_json(request, maximum=2 * 1024 * 1024):
@@ -55,6 +56,7 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
         try:
             path, method, params = "/" + path, request.method, request.query_params
             execute, user, status = None, None, 200
+            create_kind = None
             if path.startswith("/api/internal/"):
                 worker(request)
                 if path == "/api/internal/tracking/batches" and method == "POST":
@@ -77,9 +79,26 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
 
                     def execute(ctx):
                         return sky(ctx, params, user)
+                elif path == "/api/v1/messages" and method == "GET":
+                    ids = list(dict.fromkeys(params.getlist("id")))
+                    require(1 <= len(ids) <= 50, "Supply 1..50 message IDs")
+                    for message_id in ids:
+                        validate("Id", message_id)
+
+                    def execute(ctx):
+                        from .database import collection
+                        from .records import public_message
+
+                        messages = []
+                        for row in collection(ctx, "messages").find({"_id": {"$in": ids}}):
+                            message = public_message(ctx, row, user["id"] if user else None)
+                            if message:
+                                messages.append(message)
+                        return {"data": messages}
                 elif path == "/api/v1/clouds" and method == "POST":
                     body = await read_json(request)
                     execute, status = lambda ctx: create_cloud(ctx, body, user), 201
+                    create_kind = "cloud"
                 elif match := re.fullmatch(r"/api/v1/clouds/([^/]+)/messages", path):
                     id = match[1]
                     if method == "GET":
@@ -89,6 +108,7 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                     elif method == "POST":
                         body = await read_json(request)
                         execute, status = lambda ctx: create_message(ctx, id, body, user), 201
+                        create_kind = "message"
                 elif match := re.fullmatch(r"/api/v1/clouds/([^/]+)", path):
                     id = match[1]
                     if method == "GET":
@@ -109,6 +129,21 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
 
                     def execute(ctx):
                         return delete_message(ctx, id, user)
+
+                elif (match := re.fullmatch(r"/api/v1/messages/([^/]+)", path)) and method == "GET":
+                    id = match[1]
+
+                    def execute(ctx):
+                        from .database import collection
+                        from .records import public_message
+
+                        row = collection(ctx, "messages").find_one({"_id": id})
+                        if not row:
+                            fail(404, "NOT_FOUND", "Message not found")
+                        message = public_message(ctx, row, user["id"] if user else None)
+                        if message is None:
+                            fail(410, "CONTENT_UNAVAILABLE", "Post is no longer visible")
+                        return {"data": message}
                 elif path == "/api/v1/assets/upload-url" and method == "POST":
                     body = await read_json(request)
 
@@ -135,6 +170,10 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
 
             def perform(ctx):
                 upsert_profile(ctx, user)
+                if create_kind:
+                    return create_once(
+                        ctx, user, request.headers.get("idempotency-key"), path, body, execute, create_kind
+                    )
                 return execute(ctx)
 
             result = await run_in_threadpool(run, perform)
