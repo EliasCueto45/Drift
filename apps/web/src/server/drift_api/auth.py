@@ -125,7 +125,7 @@ def check_origin(request):
 
 
 def upsert_profile(ctx, user):
-    if user:
+    if user and not user.get("isAnonymous"):
         collection(ctx, "profiles").update_one(
             {"_id": user["id"]}, {"$set": {"id": user["id"], "public_profile": user}}, upsert=True
         )

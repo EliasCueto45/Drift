@@ -92,6 +92,8 @@ def public_message(ctx, row, viewer_id=None):
 
 
 def public_author(ctx, id):
+    if id.startswith("anon_"):
+        return {"id": id, "displayName": "Anonymous", "avatarUrl": None}
     row = collection(ctx, "profiles").find_one({"_id": id})
     profile = (row or {}).get("public_profile", {})
     # Explicit allowlist: profile documents may gain private fields later.
