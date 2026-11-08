@@ -1,13 +1,17 @@
-/**
- * Sky screenshot: the camera frame plus the post lettering drawn on the canvas, without any
- * of the on-screen buttons, pills or panels.
- *
- * Placeholder. Owner 3 implements the capture (see docs/handoffs/owner-1.md). Expected
- * approach: draw the <video> frame (cover-cropped to the viewport) and then the sky <canvas>
- * into an offscreen canvas at device pixel ratio, export a PNG, and offer it with the Web
- * Share API (navigator.share with files) or a download link. DOM chrome is never captured
- * because only the video and canvas are composited. Frames stay on the device.
- */
-export async function captureSkyScreenshot({ notify }: { notify: (text: string) => void }): Promise<void> {
-  notify("Screenshots are coming soon.");
+import type { SnapshotCapture } from "./snapshot";
+
+/** Prepare a local PNG for preview; native sharing happens on a separate explicit tap. */
+export async function captureSkyScreenshot({ capture, notify }: {
+  capture: SnapshotCapture | null;
+  notify?: (text: string) => void;
+}): Promise<File> {
+  try {
+    if (!capture) throw new Error("Wait for the sky to appear, then try again.");
+    const blob = await capture();
+    const name = `drift-sky-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+    return new File([blob], name, { type: "image/png" });
+  } catch (error) {
+    notify?.(error instanceof Error ? error.message : "Couldn't take a snapshot. Try again.");
+    throw error;
+  }
 }

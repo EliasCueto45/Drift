@@ -1,5 +1,13 @@
 # AR follow-up handoffs from Owner 3
 
+## User-requested sky snapshot UI
+
+The camera/simulated sky now exposes a clean frame capture to Owner 1's bottom-left screenshot icon, above the map button. Local PNG composition includes the object-fit camera crop, sky/cloud visuals and published notes, excluding DOM chrome, reticle, selection glow, draft and debug renderers. A native dialog previews the file; a second explicit tap invokes file sharing so mobile user activation is retained. Unsupported/failed sharing offers download and long-press image options, and cancel does not trigger a download. Simulated/illustrated images retain provenance. No API/storage/schema changes or automatic frame uploads.
+
+Owner 1 exact handoff: retain the `SkyStage.onCaptureReady` / `SnapshotCapture` boundary, and test rear-camera cropping plus Save Image/Photos and a chosen messaging app through the native share sheet on iOS Safari and Android Chrome. Snapshot is offered in the camera and simulated 3D views, not the map. Owner 4 exact request: keep production HTTPS and the same-origin web-share policy available; no new API keys are required.
+
+Validation: 94 frontend tests passed, including crop/PNG encoding, unready camera, file-share activation, cancellation, unsupported sharing, preview and URL cleanup. TypeScript, scoped ESLint and production build passed (existing font fallback warning). Browser verification using isolated labeled fixtures showed a cloud and its published note in the clean PNG preview, without UI/debug overlays; a first download succeeded, and a second browser download was declined at the approval gate and not retried. Actual phone share destinations remain a device acceptance check. The existing Atlas API timed out during this check; QA used separate loopback mock/proxy ports without changing live routing, then stopped them.
+
 ## Live Atlas persistence diagnosis — November 8, 2026
 
 ### Posted-content coverage correction

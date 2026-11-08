@@ -7,11 +7,9 @@ import {
   Compass,
   Map as MapIcon,
   Orbit,
-  ScanLine,
   X,
 } from "lucide-react";
 import { isValidElement } from "react";
-import { captureSkyScreenshot } from "./screenshot";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "@/lib/api/ApiProvider";
 import { AccountButton, useDriftAuth } from "@/lib/auth/DriftAuth";
@@ -57,6 +55,8 @@ import { setDeveloperMode, useDeveloperMode } from "@/features/debug/mode";
 import { remoteLog, startRemoteLog, stopRemoteLog } from "@/features/debug/remoteLog";
 import styles from "./sky.module.css";
 import { PostingStreakBadge } from "@/features/composer/PostingStreakBadge";
+import { SnapshotButton } from "./SnapshotButton";
+import type { SnapshotCapture } from "./snapshot";
 
 type View = "welcome" | "camera" | "simulated" | "map";
 
@@ -91,6 +91,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   const synthetic = config.isSyntheticDataset(datasetId);
 
   const [view, setView] = useState<View>(initialView ?? "welcome");
+  const [capture, setCapture] = useState<SnapshotCapture | null>(null);
+  const onCaptureReady = useCallback((next: SnapshotCapture | null) => setCapture(() => next), []);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -716,6 +718,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     <main className={styles.app}>
       {(view === "camera" || view === "simulated" || view === "welcome") && (
         <SkyStage
+          onCaptureReady={onCaptureReady}
+          snapshotLabel={synthetic ? "Synthetic cloud data" : view !== "camera" ? "Simulated sky" : undefined}
           mode={view === "camera" ? "camera" : "simulated"}
           stream={stream}
           getPose={view === "camera" ? getCameraPose : getSimPose}
@@ -834,9 +838,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
         <div className={styles.bottomDock}>
           <div className={styles.dockSide}>
           {view !== "map" && (
-            <button type="button" className={styles.roundButton} onClick={() => void captureSkyScreenshot({ notify })} aria-label="Take a screenshot of the sky and its posts">
-              <ScanLine size={20} aria-hidden="true" />
-            </button>
+            <SnapshotButton capture={capture} className={styles.roundButton} iconOnly notify={notify} />
           )}
           {view === "map" ? (
             !handheld && !debug ? (
