@@ -125,6 +125,7 @@
         "cloudId": { "$ref": "#/$defs/Id" },
         "authorId": { "$ref": "#/$defs/Id" },
         "author": { "$ref": "#/$defs/User" },
+        "driftDistanceM": { "type": ["number", "null"], "minimum": 0, "description": "Estimated WGS84 horizontal displacement in meters from the original posting anchor to the latest tracked anchor, not total path length. Null or absent if the original anchor is unknown." },
         "kind": { "enum": ["text", "audio", "song", "drawing", "png"] },
         "anchor": { "$ref": "#/$defs/Anchor" },
         "createdAt": { "$ref": "#/$defs/Timestamp" },

@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Camera,
   Cloud as CloudIcon,
-  Compass,
   Map as MapIcon,
   Orbit,
   X,
@@ -23,13 +22,14 @@ import type {
 import { Composer } from "@/features/composer/Composer";
 import { usePosts } from "@/features/composer/posts";
 import { CloudPanel } from "./CloudPanel";
+import { CloudFocus, type FocusFrame } from "./CloudFocus";
 import { CloudSheet } from "./CloudSheet";
 import { CloudCreator } from "./CloudCreator";
 import { freshnessText } from "./describe";
 import { DISCOVERY_RADIUS_M, placementInRange } from "./discovery";
 import { directionTo, groundDistanceM, ringCentroid } from "./geo";
 import { MapStage } from "./MapStage";
-import { Onboarding } from "./Onboarding";
+import { Onboarding, type PermissionStep } from "./Onboarding";
 import { declinationDeg, poseAngles, visibleHfovDeg } from "./orientation";
 import type { CameraPose } from "./projection";
 import {
@@ -45,6 +45,7 @@ import {
   type Draft,
   type RegistrationReport,
   type SceneSummary,
+  type SkyCapture,
 } from "./SkyStage";
 import { useSky } from "./useSky";
 import { nightOutdoorScore, outdoorScore, sunElevationDeg, VisibilityTracker, type CloudVisibility } from "./visibility";
@@ -96,6 +97,9 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   const onCaptureReady = useCallback((next: SnapshotCapture | null) => setCapture(() => next), []);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
+  const [permStep, setPermStep] = useState<PermissionStep | null>(null);
+  // A camera permission changed in settings only takes effect after a reload.
+  const [canRetry, setCanRetry] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [granted, setGranted] = useState<ViewerLocation | null>(null);
   const [locationOff, setLocationOff] = useState(false);
@@ -140,9 +144,19 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   const [placing, setPlacing] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [summary, setSummary] = useState<SceneSummary | null>(null);
-  const [nudge, setNudge] = useState(0);
-  const [calibrating, setCalibrating] = useState(false);
   const [settle, setSettle] = useState<{ id: string; at: number } | null>(null);
+  // Cloud focus: the frozen sky zooms into the chosen cloud, which then backs the posts
+  // (read) or the composer (write). `after` runs once the zoom-out has finished.
+  const captureRef = useRef<SkyCapture | null>(null);
+  const [focus, setFocus] = useState<{
+    frame: FocusFrame;
+    mode: "read" | "write";
+    arrived: boolean;
+    closing: boolean;
+    after?: () => void;
+  } | null>(null);
+  // Capture failed (cloud off screen): fall back to the plain bottom panel.
+  const [panelFallback, setPanelFallback] = useState(false);
 
   // ---- Poses ----
   const streamRef = useLatest(stream);
@@ -211,7 +225,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     }
   }, [view]);
   const declination = declinationDeg(viewer.latitude, viewer.longitude);
-  const live = useLatest({ viewer, nudge, declination });
+  const live = useLatest({ viewer, declination });
 
   // Aim the simulated camera at the nearest cloud with posts once data arrives.
   useEffect(() => {
@@ -270,7 +284,6 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     last: null as RegistrationReport | null,
     matchedAt: 0,
   });
-  const [matched, setMatched] = useState(false);
   const onRegister = useCallback((r: RegistrationReport) => {
     const g = reg.current;
     g.last = r;
@@ -278,9 +291,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       g.az = Math.max(-20, Math.min(20, g.az + 0.35 * r.dAzDeg));
       g.el = Math.max(-6, Math.min(6, g.el + 0.35 * r.dElDeg));
     }
-    const now = performance.now();
-    if (r.state === "matched") g.matchedAt = now;
-    setMatched(g.matchedAt > 0 && now - g.matchedAt < 5000);
+    if (r.state === "matched") g.matchedAt = performance.now();
   }, []);
 
   // ---- Can real clouds be seen? (night / indoors -> virtual clouds, no matching) ----
@@ -357,8 +368,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   const getCameraPose = (): Omit<CameraPose, "hfovDeg"> | null => {
     const vectors = orientation.reading.current.vectors;
     if (!vectors) return null;
-    const { viewer: v, nudge: n, declination: d } = live.current;
-    const a = poseAngles(vectors, (d ?? 0) + n + reg.current.az);
+    const { viewer: v, declination: d } = live.current;
+    const a = poseAngles(vectors, (d ?? 0) + reg.current.az);
     a.elevationDeg = Math.max(
       -89,
       Math.min(89, a.elevationDeg + reg.current.el),
@@ -413,7 +424,6 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       clouds: clouds.length,
       summary,
       declination,
-      nudge,
       stream,
     };
     const r = orientation.reading.current;
@@ -446,7 +456,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       el: pose?.elevationDeg ?? null,
       roll: pose?.rollDeg ?? null,
       decl: d.declination,
-      nudge: d.nudge,
+      nudge: 0,
       gps: d.location
         ? `${d.location.latitude.toFixed(5)}, ${d.location.longitude.toFixed(5)}`
         : "simulated",
@@ -480,10 +490,15 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   async function lookUp() {
     setBusy(true);
     setReason(null);
+    setCanRetry(false);
     // iOS: motion permission must be requested first, directly inside the tap.
+    setPermStep("motion");
     const motion = await requestOrientationPermission();
+    setPermStep("camera");
     const cam = await requestCamera();
+    setPermStep("location");
     const loc = await requestLocationOnce();
+    setPermStep(null);
     setBusy(false);
     perms.current = { motion, camera: cam.status, location: loc.status };
     remoteLog("permissions", {
@@ -499,9 +514,10 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       stopStream(cam.stream);
       // User mode on a phone: no camera means no outdoor check, so no map either.
       const toMap = debug || !handheld;
+      setCanRetry(cam.status === "denied");
       setReason(
         cam.status === "denied"
-          ? `Drift needs the camera to show posts on the sky. Allow it with the aA button in Safari's address bar, then Website Settings.${toMap ? " The map has the same clouds and posts." : ""}`
+          ? `Drift needs the camera to show posts on the sky. ${cameraHelp()}${toMap ? " The map has the same clouds and posts." : ""}`
           : toMap
             ? "This browser can't open the camera, so here's the map with the same clouds and posts."
             : "This browser can't open the camera. Try Safari or Chrome on your phone.",
@@ -539,16 +555,40 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   const sheetItem = skyClouds.find((c) => c.cloud.id === sheetId) ?? null;
   const composing = Boolean(activeDraft) && !placingNow;
 
+  function openFocus(mode: "read" | "write", cloudId: string, center?: { x: number; y: number }) {
+    const cap = captureRef.current;
+    const rect = cap?.cloudRect(cloudId) ?? null;
+    const image = rect ? cap!.snapshot() : null;
+    if (!rect || !image) return false;
+    setFocus({ frame: { image, rect, center }, mode, arrived: false, closing: false });
+    return true;
+  }
+  /** Zoom back out to the live sky, then run `after`. */
+  function closeFocus(after?: () => void) {
+    if (!focus) {
+      after?.();
+      return;
+    }
+    setFocus({ ...focus, closing: true, after });
+  }
+  function onFocusClosed() {
+    const after = focus?.after;
+    setFocus(null);
+    after?.();
+  }
   function startPost() {
     setSheetId(null);
     setSelectedId(null);
     setPlacing(true);
   }
   function onTap(id: string | null) {
-    if (draft) return;
+    if (draft || focus) return;
     setSelectedId(id);
+    // Tapping a cloud zooms into it; its posts then sit on the cloud itself.
+    const focused = Boolean(id && openFocus("read", id));
+    setPanelFallback(Boolean(id) && !focused);
     const target =
-      id && view === "simulated" ? clouds.find((c) => c.cloud.id === id) : null;
+      id && view === "simulated" && !focused ? clouds.find((c) => c.cloud.id === id) : null;
     if (target) {
       // Frame the tapped cloud in the upper third so its caption sheet doesn't cover it.
       const centroid = ringCentroid(
@@ -566,7 +606,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
         panSimTo(dir.azimuthDeg, want);
     }
   }
-  function onPlace(cloudId: string, anchor: Anchor) {
+  function onPlace(cloudId: string, anchor: Anchor, at?: { x: number; y: number }) {
     if (clouds.find((c) => c.cloud.id === cloudId)?.cloud.status !== "active") {
       notify("That cloud isn't taking new posts right now. Pick another one.");
       return;
@@ -579,7 +619,9 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     }
     setPlacing(false);
     setSelectedId(cloudId);
-    if (view === "simulated") {
+    // Zoom into the chosen spot; the composer then opens on the cloud.
+    const focused = Boolean(at && view !== "map" && openFocus("write", cloudId, at));
+    if (view === "simulated" && !focused) {
       // Bring the chosen spot above the composer so the words can be watched settling in.
       const target = clouds.find((c) => c.cloud.id === cloudId);
       const dir = directionTo(
@@ -610,29 +652,53 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   );
   function onPublished(m: Message) {
     addCreated(m);
-    setSettle({ id: m.id, at: performance.now() });
     setDraft(null);
-    setSelectedId(m.cloudId);
+    setSelectedId(null);
     notify("Posted. It travels with this cloud now.");
     refreshSky();
+    // Back out to the live sky, then let the new words settle into the cloud.
+    closeFocus(() => setSettle({ id: m.id, at: performance.now() }));
   }
   /** `final`: the cloud is gone (merged, split, dissipated); otherwise re-place on the refreshed cloud. */
   function onStale(reasonText: string, final: boolean) {
     notify(reasonText);
     refreshSky();
-    if (final) {
-      setDraft(null);
-      setSelectedId(null);
-    } else setPlacing(true);
+    closeFocus(() => {
+      if (final) {
+        setDraft(null);
+        setSelectedId(null);
+      } else setPlacing(true);
+    });
   }
   function cancelPost() {
-    setDraft(null);
-    setPlacing(false);
+    closeFocus(() => {
+      setDraft(null);
+      setPlacing(false);
+      setSelectedId(null);
+    });
+  }
+  function closePanel() {
+    closeFocus(() => setSelectedId(null));
   }
 
   // ---- Chrome ----
-  const fresh = freshnessText(freshness, asOf, synthetic);
-  const showPanel = selected && !placingNow && !activeDraft && !sheetId && view !== "welcome";
+  const fresh = freshnessText(freshness, asOf, synthetic, skyStatus === "error");
+  // Focus only lives in the sky views, and only while what it frames still exists.
+  const liveFocus =
+    focus && (view === "camera" || view === "simulated") && !indoorBlocked && (focus.closing || (focus.mode === "read" ? Boolean(selected || sheetItem) : Boolean(activeDraft)))
+      ? focus
+      : null;
+  const focusReady = Boolean(liveFocus?.arrived && !liveFocus.closing);
+  const onCloud = Boolean(liveFocus);
+  const showPanel =
+    selected &&
+    !placingNow &&
+    !activeDraft &&
+    !sheetId &&
+    view !== "welcome" &&
+    (view === "map" || (liveFocus ? liveFocus.mode === "read" && focusReady : panelFallback));
+  const showComposer = Boolean(activeDraft && draftCloud) && (!liveFocus || (liveFocus.mode === "write" && focusReady));
+  const showSheet = Boolean(sheetItem) && (!liveFocus || focusReady);
 
   const inView = summary?.visible ?? 0;
   const stageLabel = `${view === "simulated" ? "Simulated sky" : "Camera view of the sky"}. ${inView} tracked cloud${inView === 1 ? "" : "s"} in view. Posts are listed when you select a cloud.`;
@@ -662,34 +728,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       hint = (
         <>No tracked clouds within {DISCOVERY_RADIUS_M / 1000} km right now.</>
       );
-    else if (calibrating && view === "camera") {
-      hint = (
-        <span className={styles.nudge}>
-          Line posts up with the clouds
-          <button
-            type="button"
-            aria-label="Turn overlay left 2 degrees"
-            onClick={() => setNudge((n) => n - 2)}
-          >
-            <ArrowLeft size={18} aria-hidden="true" />
-          </button>
-          <span className="tabular" aria-live="polite">
-            {nudge > 0 ? "+" : ""}
-            {nudge}°
-          </span>
-          <button
-            type="button"
-            aria-label="Turn overlay right 2 degrees"
-            onClick={() => setNudge((n) => n + 2)}
-          >
-            <ArrowRight size={18} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => setCalibrating(false)}>
-            Done
-          </button>
-        </span>
-      );
-    } else if (summary && summary.visible === 0 && summary.turn) {
+    else if (summary && summary.visible === 0 && summary.turn) {
       const t = summary.turn.turnDeg;
       hint = (
         <>
@@ -748,6 +787,15 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           onRegister={view === "camera" ? onRegister : undefined}
           virtualClouds={cloudsHidden && !indoorBlocked ? (effectiveVis.reason === "night" || isNight ? "night" : "day") : "off"}
           debug={debug}
+          captureRef={captureRef}
+        />
+      )}
+      {liveFocus && (
+        <CloudFocus
+          frame={liveFocus.frame}
+          closing={liveFocus.closing}
+          onArrived={() => setFocus((f) => (f && !f.arrived ? { ...f, arrived: true } : f))}
+          onClosed={onFocusClosed}
         />
       )}
       {view === "map" && (
@@ -765,7 +813,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
         />
       )}
 
-      <header className={styles.topbar}>
+      <header className={styles.topbar} hidden={onCloud}>
         <div className={styles.pills}>
           {view !== "welcome" && view !== "camera" && <DriftLogo />}
           {view !== "welcome" && <PostingStreakBadge className={styles.pill} />}
@@ -791,16 +839,6 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           {debug && (
             <button type="button" className={styles.signInButton} onClick={() => setDeveloperMode(false)} aria-label="Developer mode is on. Switch to user mode">
               Developer
-            </button>
-          )}
-          {view === "camera" && !indoorBlocked && (
-            <button type="button" className={styles.signInButton} onClick={() => setCalibrating((c) => !c)} aria-pressed={calibrating}>
-              <Compass size={16} aria-hidden="true" />
-              {matched && !cloudsHidden
-                ? "Matched to visible clouds"
-                : declination === null
-                  ? "Compass uncorrected"
-                  : "Approximate positions"}
             </button>
           )}
           {view === "map" && !viewerIsReal && (
@@ -835,15 +873,17 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       {view === "welcome" && (
         <Onboarding
           busy={busy}
+          step={permStep}
           handheld={handheld}
           reason={reason}
+          onRetry={canRetry ? () => window.location.reload() : undefined}
           onLookUp={lookUp}
           onMap={mapAllowed ? () => setView("map") : undefined}
           onSimulated={debug ? () => setView("simulated") : undefined}
         />
       )}
 
-      {view !== "welcome" && !showPanel && !composing && (
+      {view !== "welcome" && !showPanel && !composing && !liveFocus && (
         <div className={styles.bottomDock}>
           <div className={styles.dockSide}>
           {view !== "map" && (
@@ -889,14 +929,16 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
         <CloudPanel
           item={selected}
           viewer={viewer}
-          onClose={() => setSelectedId(null)}
+          onCloud={onCloud}
+          onClose={closePanel}
           onOpen={() => setSheetId(selected.cloud.id)}
         />
       )}
 
-      {activeDraft && draftCloud && (
+      {showComposer && activeDraft && draftCloud && (
         <div hidden={placingNow}>
           <Composer
+            onCloud={onCloud}
             item={draftCloud}
             anchor={activeDraft.anchor}
             viewer={viewer}
@@ -904,13 +946,14 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
             onPublished={onPublished}
             onStale={onStale}
             onDraft={onDraftText}
-            onMoveSpot={() => setPlacing(true)}
+            onMoveSpot={() => closeFocus(() => setPlacing(true))}
           />
         </div>
       )}
 
-      {sheetItem && (
+      {showSheet && sheetItem && (
         <CloudSheet
+          onCloud={onCloud}
           key={`${sheetItem.cloud.id}:${auth.userId ?? "anonymous"}`}
           item={sheetItem}
           viewer={viewer}
@@ -951,4 +994,15 @@ function nodeText(node: React.ReactNode): string {
   if (Array.isArray(node)) return node.map(nodeText).join("");
   if (isValidElement<{ children?: React.ReactNode }>(node)) return nodeText(node.props.children);
   return "";
+}
+
+/** Where to turn the camera back on, in this browser's own words. */
+function cameraHelp(): string {
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua);
+  if (ios && /CriOS/.test(ua)) return "Open iPhone Settings, then Chrome, and turn on Camera. Then come back and tap Try again.";
+  if (ios && /FxiOS|EdgiOS/.test(ua)) return "Open iPhone Settings, find this browser, and turn on Camera. Then come back and tap Try again.";
+  if (ios) return "Tap aA in the address bar, then Website Settings, and set Camera to Allow. Then tap Try again.";
+  if (/Android/.test(ua)) return "Tap the icon left of the address, then Permissions, and allow Camera. Then tap Try again.";
+  return "Allow the camera in this site's settings (the icon left of the address), then tap Try again.";
 }

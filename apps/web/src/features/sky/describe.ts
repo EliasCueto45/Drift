@@ -33,8 +33,10 @@ export function ago(iso: string | null, now = Date.now()) {
   return `${Math.round(s / 86400)} days ago`;
 }
 
-export function freshnessText(freshness: Freshness | null, asOf: string | null, synthetic: boolean) {
+export function freshnessText(freshness: Freshness | null, asOf: string | null, synthetic: boolean, failing = false) {
   const when = ago(asOf);
+  // Nothing loaded yet and the last request failed: say so instead of "Loading" forever.
+  if (!freshness && failing) return { label: "Can't reach Drift · retrying", tone: "stale" as const };
   switch (freshness) {
     case "live":
       return { label: `Live · seen ${when}`, tone: "live" as const };

@@ -1,5 +1,5 @@
 from .database import collection, dataset_time
-from .geometry import covers, validate_geometry
+from .geometry import covers, distance_m, validate_geometry
 from .validation import compact, fail, require, timestamp
 
 
@@ -83,6 +83,8 @@ def public_message(ctx, row, viewer_id=None):
     votes = collection(ctx, "votes")
     return {
         **row["payload"],
+        "driftDistanceM": distance_m(row["initial_anchor"], row["payload"]["anchor"])
+        if row.get("initial_anchor") is not None else None,
         "author": public_author(ctx, row["author_id"]),
         "voteCount": votes.count_documents({"message_id": row["id"]}),
         "viewerHasUpvoted": bool(

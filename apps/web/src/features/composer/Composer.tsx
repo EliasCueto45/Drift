@@ -58,7 +58,10 @@ export function Composer({
   onStale,
   onDraft,
   onMoveSpot,
+  onCloud = false,
 }: {
+  /** Drawn over the zoomed-in cloud instead of on a white sheet. */
+  onCloud?: boolean;
   item: CloudWithPreviews;
   anchor: Anchor;
   viewer: Anchor;
@@ -191,6 +194,7 @@ export function Composer({
   return (
     <form
       className={styles.composer}
+      data-surface={onCloud ? "cloud" : undefined}
       onSubmit={submit}
       aria-labelledby={ids.title}
       noValidate

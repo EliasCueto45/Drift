@@ -76,6 +76,7 @@ def create_message(ctx, cloud_id, value, user, time_zone=None):
             "asset_id": value.get("assetId"),
             "payload": message,
             "anchor": point_geometry(value["anchor"]),
+            "initial_anchor": dict(value["anchor"]),
             "strokes": value.get("strokes"),
             "position_at": timestamp(at),
             "expired_at": None,
@@ -87,7 +88,7 @@ def create_message(ctx, cloud_id, value, user, time_zone=None):
     from .streaks import record_post
 
     record_post(ctx, user, time_zone)
-    return {"data": {**message, "author": public_author(ctx, user["id"])}}
+    return {"data": {**message, "author": public_author(ctx, user["id"]), "driftDistanceM": 0}}
 
 
 def delete_message(ctx, id, user):
