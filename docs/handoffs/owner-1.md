@@ -1,5 +1,7 @@
 # Owner 1 — Frontend handoffs
 
+Owner 3 completion: wired the existing bottom-left screenshot placement to `SnapshotButton`, using `captureSkyScreenshot({ capture, notify })` to prepare the PNG from the clean `SkyStage.onCaptureReady` painter. Removed the duplicate header action when integrating main. Preview offers native file sharing on a second tap plus Save image; capture failures reach `notify`. Export excludes draft/debug/selection UI and retains simulated-image provenance. See `owner-3-ar.md` for verification and the remaining real-phone share-sheet acceptance check. The request below records the original placeholder handoff.
+
 ## Owner 3 — Sky screenshot (requested 2026-11-08)
 
 The camera view has a screenshot button (bottom-left, above the map button). It calls

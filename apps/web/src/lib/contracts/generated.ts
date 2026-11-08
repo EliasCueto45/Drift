@@ -182,6 +182,10 @@ export interface Message {
   cloudId: Id;
   authorId: Id;
   author?: User;
+  /**
+   * Estimated WGS84 horizontal displacement in meters from the original posting anchor to the latest tracked anchor, not total path length. Null or absent if the original anchor is unknown.
+   */
+  driftDistanceM?: number | null;
   kind: "text" | "audio" | "song" | "drawing" | "png";
   anchor: Anchor;
   createdAt: Timestamp;

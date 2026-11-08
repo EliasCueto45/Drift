@@ -1,5 +1,7 @@
 # Owner 2 — Remaining integration work
 
+- **Drift-distance phone acceptance (Owners 1/3/4):** verify age/distance metadata wraps in preview and expanded lists on phones. New posts retain their original anchor across tracking updates and cloud transfers; older documents without an original anchor intentionally show unavailable. No new worker fields or satellite fetches are required. This is estimated displacement from the posting spot, not cumulative travel distance.
+
 - **Anonymous/streak browser acceptance (Owners 1/2/4):** verify anonymous post/cloud creation, reload, ownership deletion and local-midnight streak display through the deployed Next proxy on phones. Check HttpOnly/Secure cookie delivery and separate Clerk/guest identities. Travel-time-zone changes and guest-to-account migration are intentionally not implemented. The current on-device classifier supplies rendering hints; trusted outdoor eligibility would need a server verification contract before gating streaks.
 
 - **Browser Clerk acceptance (Owners 1/2/4):** configure `DRIFT_APP_ORIGIN` to the actual browser/tunnel origin and the UI dataset to the provisioned live dataset. Verify two real Clerk users can create/delete clouds, post/delete messages, vote/unvote, see public authors and fail unauthorized mutations. Repeat with a lost response, reload and moving/retired clouds. Component/API tests do not establish real browser acceptance.

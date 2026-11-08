@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from drift_api.validation import iso, now, validate, ApiError, timestamp, outline_vertices
 from drift_api.geometry import validate_geometry
+from drift_api.geometry import distance_m
 from drift_api.anonymous import COOKIE, SESSION_DAYS, new_token
 from drift_api.streaks import initial_streak, advance, streak_summary, time_zone
 from .common import scenarios
@@ -20,6 +21,7 @@ def create_mock():
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     clouds: dict[str, Any] = {}
     messages: dict[str, Any] = {}
+    initial_anchors: dict[str, Any] = {}
     sequences: dict[str, int] = {}
     batches: dict[str, Any] = {}
     votes: dict[str, bool] = {}
@@ -33,6 +35,7 @@ def create_mock():
     for scenario in scenarios():
         profiles.update({user["id"]: user for user in scenario["meta"]["seed"]["users"]})
         messages.update({msg["id"]: copy.deepcopy(msg) for msg in scenario["meta"]["seed"]["messages"]})
+        initial_anchors.update({msg["id"]: dict(msg["anchor"]) for msg in scenario["meta"]["seed"]["messages"]})
     secret = os.getenv("TRACKING_INGEST_SECRET", "dev-only-change-me")
 
     def error(status, code, message):
@@ -56,6 +59,8 @@ def create_mock():
     def public(msg):
         return {
             **msg,
+            "driftDistanceM": distance_m(initial_anchors[msg["id"]], msg["anchor"])
+            if msg["id"] in initial_anchors else None,
             "author": profiles.get(
                 msg["authorId"], {"id": msg["authorId"], "displayName": None, "avatarUrl": None}
             ),
@@ -301,6 +306,7 @@ def create_mock():
                 except ApiError as invalid:
                     return error(invalid.status, invalid.code, invalid.message)
                 messages[id] = msg
+                initial_anchors[id] = dict(msg["anchor"])
                 streaks[principal] = streak
                 remember(id, "message")
                 return JSONResponse({"data": public(msg)}, status_code=201)

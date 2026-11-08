@@ -5,6 +5,7 @@ import { useDriftAuth } from "@/lib/auth/DriftAuth";
 import type { Message } from "@/lib/contracts";
 import { linkLabel, timeAgo, usePosts } from "./posts";
 import styles from "./composer.module.css";
+import { driftDistanceText } from "./driftDistance";
 
 /** One post in a list: its words, link if any, age, and the upvote toggle. */
 export function PostItem({ message }: { message: Message; mine?: boolean }) {
@@ -44,6 +45,10 @@ export function PostItem({ message }: { message: Message; mine?: boolean }) {
         <p className={styles.itemMeta}>
           {owned ? message.authorId.startsWith("anon_") ? "Your anonymous post" : "Your post" : message.author?.displayName || "Drift user"} ·{" "}
           {timeAgo(message.createdAt)}
+          {" · "}
+          <span title="Estimated distance from the original posting spot to the latest tracked position, not the total path traveled. Updates with tracking; stale observations do not add movement.">
+            {driftDistanceText(message.driftDistanceM)}
+          </span>
         </p>
         {owned &&
           (!confirming ? (

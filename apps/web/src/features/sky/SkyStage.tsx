@@ -12,6 +12,7 @@ import { TAP_TOLERANCE_PX, anchorOnCloud, buildScene, nearestOffscreen, pickClou
 import type { SkyProjection } from "./projection";
 import { drawVirtualClouds, layoutVirtualClouds } from "./virtualClouds";
 import { useLatest } from "@/lib/useLatest";
+import { captureSkyImage, type SnapshotCapture } from "./snapshot";
 import styles from "./sky.module.css";
 
 export interface SceneSummary {
@@ -50,6 +51,8 @@ export interface Draft {
 }
 
 interface Props {
+  onCaptureReady?: (capture: SnapshotCapture | null) => void;
+  snapshotLabel?: string;
   mode: "camera" | "simulated";
   stream: MediaStream | null;
   getPose: () => Omit<CameraPose, "hfovDeg"> | null;
@@ -100,6 +103,16 @@ export function SkyStage(props: Props) {
   const { created, vote } = usePosts();
   const postsRef = useLatest({ created, vote });
   const sceneRef = useRef<{ clouds: SceneCloud[]; projection: SkyProjection } | null>(null);
+  const captureFrameRef = useRef<SnapshotCapture | null>(null);
+  const onCaptureReady = props.onCaptureReady;
+
+  useEffect(() => {
+    onCaptureReady?.(() => {
+      if (!captureFrameRef.current) throw new Error("Wait for the sky to appear, then try again.");
+      return captureFrameRef.current();
+    });
+    return () => { onCaptureReady?.(null); };
+  }, [onCaptureReady]);
 
   // Freeze-frame for the focus zoom: what the person sees, minus every control.
   const { captureRef } = props;
@@ -289,6 +302,37 @@ export function SkyStage(props: Props) {
         reserved: draftPost ? [draftPost] : [],
         priorityId: p.settle?.id ?? null,
       });
+      const capturedFade = fade;
+      const capturedTint = fadeTint;
+      // Paint a separate clean frame, not a screenshot of DOM controls or the debug canvas.
+      captureFrameRef.current = () => {
+        if (p.mode === "camera" && !videoRef.current) throw new Error("Wait for the camera, then try again.");
+        return captureSkyImage({
+        width, height, pixelRatio: dpr,
+        video: p.mode === "camera" ? videoRef.current : null,
+        draw: (photo) => {
+          if (p.mode === "simulated") {
+            const horizonY = height / 2 + scene.projection.focalPx * Math.tan(pose.elevationDeg * DEG);
+            drawSimulatedSky(photo, width, height, horizonY);
+            drawVirtualClouds(photo, layoutVirtualClouds(scene.clouds, scene.projection, { width, height }), "day", 1);
+          } else if (capturedFade > 0) {
+            drawVirtualClouds(photo, layoutVirtualClouds(scene.clouds, scene.projection, { width, height }), capturedTint, capturedFade);
+          }
+          const notes = layoutPosts(photo, scene.clouds, { selectedId: null, viewport: { width, height }, votes });
+          for (const note of notes) drawVaporText(photo, note);
+          const label = p.snapshotLabel ?? (capturedFade > 0 ? "Illustrated clouds" : null);
+          if (label) {
+            photo.save();
+            photo.font = "12px system-ui, sans-serif";
+            photo.fillStyle = "#fff";
+            photo.shadowColor = "#000";
+            photo.shadowBlur = 4;
+            photo.fillText(label, 12, height - 14);
+            photo.restore();
+          }
+        },
+        });
+      };
       const reduce = reducedMotion.matches;
       for (const post of placed) {
         const t = p.settle && post.id === p.settle.id && !reduce ? (now - p.settle.at) / SETTLE_MS : 1;
@@ -322,6 +366,7 @@ export function SkyStage(props: Props) {
     return () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
+      captureFrameRef.current = null;
     };
   }, [propsRef, postsRef]);
 
