@@ -39,6 +39,7 @@ interface PostStore {
   toggleVote: (m: Message) => Promise<void>;
   created: Record<string, Message[]>;
   addCreated: (m: Message) => void;
+  postingRevision: number;
   removed: ReadonlySet<string>;
   removedClouds: ReadonlySet<string>;
   deletePost: (id: string) => Promise<void>;
@@ -62,6 +63,7 @@ export function PostProvider({ children }: { children: ReactNode }) {
   const api = useApi(),
     auth = useDriftAuth();
   const [store, setStore] = useState(() => empty(auth.userId));
+  const [postingRevision, setPostingRevision] = useState(0);
   // Reset only this store on account changes; keep camera and draft components mounted.
   if (store.account !== auth.userId)
     setStore(empty(auth.userId, store.epoch + 1));
@@ -87,6 +89,7 @@ export function PostProvider({ children }: { children: ReactNode }) {
   const toggleVote = useCallback(
     async (message: Message) => {
       if (!auth.signedIn) {
+        notify("Sign in to vote. Anonymous posting is available without an account.");
         auth.signIn();
         return;
       }
@@ -164,6 +167,7 @@ export function PostProvider({ children }: { children: ReactNode }) {
   );
 
   const addCreated = useCallback((message: Message) => {
+    setPostingRevision((n) => n + 1);
     setStore((s) =>
       s.account !== message.authorId
         ? s
@@ -313,6 +317,7 @@ export function PostProvider({ children }: { children: ReactNode }) {
       toggleVote,
       created: store.created,
       addCreated,
+      postingRevision,
       removed: store.removed,
       removedClouds: store.removedClouds,
       deletePost,
@@ -327,6 +332,7 @@ export function PostProvider({ children }: { children: ReactNode }) {
       toggleVote,
       store.created,
       addCreated,
+      postingRevision,
       store.removed,
       store.removedClouds,
       deletePost,

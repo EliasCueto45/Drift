@@ -52,6 +52,7 @@ import { DebugHud, type DebugSnapshot } from "@/features/debug/DebugHud";
 import { setDeveloperMode, useDeveloperMode } from "@/features/debug/mode";
 import { remoteLog, startRemoteLog, stopRemoteLog } from "@/features/debug/remoteLog";
 import styles from "./sky.module.css";
+import { PostingStreakBadge } from "@/features/composer/PostingStreakBadge";
 
 type View = "welcome" | "camera" | "simulated" | "map";
 
@@ -723,6 +724,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
       <header className={styles.topbar}>
         <div className={styles.pills}>
+          {view !== "welcome" && <PostingStreakBadge className={styles.pill} />}
           {/* Five quick taps switch on developer mode (hidden from users on purpose). */}
           <span className={styles.pill} data-tone={fresh.tone} role="status" onClick={onStatusTap}>
             <span className={styles.dot} aria-hidden="true" />
