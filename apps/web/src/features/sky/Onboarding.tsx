@@ -15,7 +15,8 @@ export function Onboarding({
   handheld: boolean;
   reason: string | null;
   onLookUp: () => void;
-  onMap: () => void;
+  /** Absent on a phone in user mode: the map opens only from the camera, once outdoors. */
+  onMap?: () => void;
   /** Developer mode only; absent in user mode, which hides the simulated sky. */
   onSimulated?: () => void;
 }) {
@@ -37,10 +38,12 @@ export function Onboarding({
               <Camera size={20} strokeWidth={2.25} aria-hidden="true" />
               {busy ? "Waiting for permission…" : "Look up"}
             </button>
-            <button type="button" className="drift-secondary" onClick={onMap} disabled={busy}>
-              <MapIcon size={18} strokeWidth={2.25} aria-hidden="true" />
-              Map
-            </button>
+            {onMap && (
+              <button type="button" className="drift-secondary" onClick={onMap} disabled={busy}>
+                <MapIcon size={18} strokeWidth={2.25} aria-hidden="true" />
+                Map
+              </button>
+            )}
           </>
         ) : (
           <>
