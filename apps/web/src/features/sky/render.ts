@@ -145,39 +145,36 @@ function linkWord(url: string | null) {
   }
 }
 
+/** Post text colour: near-black ink, a few shades off pure black so it sits in the cloud. */
+export const POST_INK = "rgb(38, 41, 46)";
+
 /**
- * Vapor letterforms in relief: a soft pool of cloud-shadow under the word, a crisp shaded
- * underside, then the lit white face. Reads on bright cloud and on blue sky alike.
+ * Dark ink lettering on the cloud. A soft white halo keeps words legible where they spill
+ * past the cloud onto blue sky or the night; less certain placements are drawn softer.
  */
 export function drawVaporText(ctx: CanvasRenderingContext2D, p: PlacedPost) {
   ctx.save();
   ctx.font = vaporFont(p.size);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
   const k = px(ctx);
   const lineH = p.size * 1.08;
   const top = p.y - ((p.lines.length - 1) * lineH) / 2;
   const soft = (p.certainty === "measured" ? 1 : p.certainty === "estimated" ? 1.5 : 2.4) * (p.soften ?? 1);
-  const each = (dy = 0) => p.lines.forEach((line, i) => ctx.fillText(line, p.x, top + i * lineH + dy));
+  const each = (draw: (line: string, y: number) => void) => p.lines.forEach((line, i) => draw(line, top + i * lineH));
   ctx.globalAlpha = p.alpha;
-  // 1. Shadow pool: the cloud darkens softly where the words sit.
-  ctx.shadowColor = "rgba(30, 50, 80, 0.42)";
-  ctx.shadowBlur = p.size * 0.5 * soft * k;
-  ctx.shadowOffsetY = p.size * 0.1 * k;
-  ctx.fillStyle = "rgba(30, 50, 80, 0.01)";
-  each();
-  // 2. Shaded underside, close and crisp.
-  ctx.shadowColor = "rgba(34, 56, 88, 0.85)";
-  ctx.shadowBlur = Math.max(1.5, p.size * 0.06) * soft * k;
-  ctx.shadowOffsetY = Math.max(1.5, p.size * 0.075) * k;
-  ctx.fillStyle = "#e9eff5";
-  each();
-  // 3. Lit face, slightly translucent so the cloud's own texture shows through the letters.
-  ctx.shadowColor = "rgba(255, 255, 255, 0.6)";
-  ctx.shadowBlur = p.size * 0.12 * soft * k;
-  ctx.shadowOffsetY = 0;
-  ctx.fillStyle = "rgba(255, 255, 255, 0.93)";
-  each(-Math.max(0.5, p.size * 0.025));
+  // 1. Halo: a soft white glow behind the letters.
+  ctx.shadowColor = "rgba(255, 255, 255, 0.85)";
+  ctx.shadowBlur = p.size * 0.45 * k;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.lineWidth = p.size * 0.16;
+  each((line, y) => ctx.strokeText(line, p.x, y));
+  // 2. Ink face. Uncertainty blurs the edges a little rather than changing the colour.
+  ctx.shadowColor = "rgba(38, 41, 46, 0.55)";
+  ctx.shadowBlur = Math.max(0, soft - 1) * p.size * 0.08 * k;
+  ctx.fillStyle = POST_INK;
+  each((line, y) => ctx.fillText(line, p.x, y));
   ctx.restore();
 }
 

@@ -34,3 +34,8 @@ npm run typecheck && npm run lint && npm test && npm run contracts:check
 - `src/features/sky/` — `projection.ts` (the single `SkyProjection`, geo <-> screen both ways), `geo.ts` (WGS84/ECEF/ENU), `orientation.ts` + `sensors.ts` (camera pose, permissions), `scene.ts` (per-frame scene, hit testing), `render.ts` (vapor lettering, synthetic clouds), `SkyStage.tsx` (camera/simulated canvas), `MapStage.tsx` (2D fallback), `CloudPanel.tsx`, `CloudSheet.tsx`, `DriftApp.tsx` (flow).
 - `src/features/composer/` — `Composer.tsx`, `PostItem.tsx`, `posts.tsx` (votes, local posts).
 - `src/lib/` — API client, contract types, Clerk/dev auth bridge.
+
+## Third-party assets
+
+- Indoor/outdoor scene model: Places365 ResNet18 (MIT CSAIL, CC BY), int8, run on the device with onnxruntime-web. Camera frames never leave the phone. Credits and build steps: `public/models/CREDITS.md`, `scripts/build_scene_model.py`. `npm run dev`/`build` copy the onnxruntime WASM into `public/ort/` (gitignored).
+- Virtual cloud photos (CC0 / public domain): `public/clouds/CREDITS.md`, built with `scripts/make_cloud_sprites.py`.
