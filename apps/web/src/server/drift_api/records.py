@@ -83,11 +83,21 @@ def public_message(ctx, row, viewer_id=None):
     votes = collection(ctx, "votes")
     return {
         **row["payload"],
+        "author": public_author(ctx, row["author_id"]),
         "voteCount": votes.count_documents({"message_id": row["id"]}),
         "viewerHasUpvoted": bool(
             viewer_id and votes.find_one({"message_id": row["id"], "user_id": viewer_id})
         ),
     }
+
+
+def public_author(ctx, id):
+    if id.startswith("anon_"):
+        return {"id": id, "displayName": "Anonymous", "avatarUrl": None}
+    row = collection(ctx, "profiles").find_one({"_id": id})
+    profile = (row or {}).get("public_profile", {})
+    # Explicit allowlist: profile documents may gain private fields later.
+    return {"id": id, "displayName": profile.get("displayName"), "avatarUrl": profile.get("avatarUrl")}
 
 
 def expire_message(ctx, id, at):

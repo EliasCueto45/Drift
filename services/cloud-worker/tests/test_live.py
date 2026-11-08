@@ -83,7 +83,10 @@ def test_supervisor_retries_download_dns_failure_without_discarding_journal(tmp_
             raise KeyboardInterrupt
 
     monkeypatch.setattr(live, "worker_main", run)
-    monkeypatch.setattr(live.time, "sleep", sleep)
+    # Replace only the worker's module binding. Patching time.sleep globally
+    # also changes PyMongo background threads in the combined integration suite.
+    from types import SimpleNamespace
+    monkeypatch.setattr(live, "time", SimpleNamespace(sleep=sleep))
     assert live.main(["--state-dir", str(tmp_path)]) == 0
     assert statuses == ["unavailable", "live"]
     assert not (tmp_path / "acquisition.lock").exists()
@@ -94,7 +97,8 @@ def test_supervisor_still_stops_on_nonretryable_worker_failure(tmp_path, monkeyp
 
     monkeypatch.setattr(live, "discover", lambda *_: discover(FakeCatalog(), NOW))
     monkeypatch.setattr(live, "worker_main", lambda *a, **kw: 1)
-    monkeypatch.setattr(live.time, "sleep", lambda _: pytest.fail("fatal error must not retry"))
+    from types import SimpleNamespace
+    monkeypatch.setattr(live, "time", SimpleNamespace(sleep=lambda _: pytest.fail("fatal error must not retry")))
     assert live.main(["--state-dir", str(tmp_path)]) == 1
 
 

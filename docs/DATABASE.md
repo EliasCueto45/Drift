@@ -1,6 +1,8 @@
 # MongoDB Atlas and Python API setup
 
-Use Python 3.12 and the root `requirements.lock.txt`. Install the root project and tracking worker as editable packages following the root README. No Node/pnpm installation is required. Canonical HTTP payloads and the existing MongoDB collection format remain compatible with the previous backend; this port requires no data export or reset.
+Use Python 3.12 and the root `requirements.lock.txt`. Install the root project and tracking worker as editable packages following the root README. The Next.js browser frontend also needs Node; see `apps/web/README.md`. Canonical HTTP payloads and the existing MongoDB collection format remain compatible with the previous backend; this port requires no data export or reset.
+
+Daily posting streaks and anonymous sessions use two automatically initialized collections: `posting_streaks` and `anonymous_sessions`. Both have TTL indexes on `expires_at`; Clerk streak rows omit expiry. Anonymous session credentials are stored only as SHA-256 hashes, with a random public principal ID. Restart the API after deployment so initialization runs. Existing Atlas connection settings and database remain valid; no separate API key or manual data migration is needed. Keep Next `/api` forwarding under the same public HTTPS origin so session cookies and `Set-Cookie` reach the browser.
 
 ## Private configuration
 

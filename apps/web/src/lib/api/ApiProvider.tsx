@@ -6,8 +6,8 @@ import { DriftApi } from "./client";
 const ApiContext = createContext<DriftApi | null>(null);
 
 export function ApiProvider({ children }: { children: ReactNode }) {
-  const { getToken } = useDriftAuth();
-  const api = useMemo(() => new DriftApi(getToken), [getToken]);
+  const { getToken, ensureAnonymous } = useDriftAuth();
+  const api = useMemo(() => new DriftApi(getToken, "/api/v1", ensureAnonymous), [getToken, ensureAnonymous]);
   return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;
 }
 

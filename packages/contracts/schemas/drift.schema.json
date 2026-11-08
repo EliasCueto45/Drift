@@ -48,7 +48,7 @@
       "type": "object",
       "required": ["id", "displayName", "avatarUrl"],
       "properties": {
-        "id": { "$ref": "#/$defs/Id", "description": "Verified Clerk user ID" },
+        "id": { "$ref": "#/$defs/Id", "description": "Verified Clerk user ID or server-issued anonymous browser ID" },
         "displayName": { "type": ["string", "null"] },
         "avatarUrl": { "type": ["string", "null"] }
       }
@@ -124,6 +124,7 @@
         "version": { "type": "integer", "minimum": 1 },
         "cloudId": { "$ref": "#/$defs/Id" },
         "authorId": { "$ref": "#/$defs/Id" },
+        "author": { "$ref": "#/$defs/User" },
         "kind": { "enum": ["text", "audio", "song", "drawing", "png"] },
         "anchor": { "$ref": "#/$defs/Anchor" },
         "createdAt": { "$ref": "#/$defs/Timestamp" },
@@ -265,9 +266,119 @@
       "required": ["outline", "assumedAltitudeM"],
       "properties": {
         "outline": { "$ref": "#/$defs/Polygon" },
-        "assumedAltitudeM": { "const": 2000 }
+        "assumedAltitudeM": { "const": 2000 },
+        "datasetId": { "$ref": "#/$defs/Id" }
       },
       "not": { "anyOf": [{ "required": ["creatorId"] }, { "required": ["expiresAt"] }] }
+    },
+    "PostingStreak": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currentDays",
+        "longestDays",
+        "totalPostingDays",
+        "totalPosts",
+        "lastPostedOn",
+        "postedToday",
+        "timeZone",
+        "nextResetAt",
+        "isAnonymous"
+      ],
+      "properties": {
+        "currentDays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "longestDays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalPostingDays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalPosts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastPostedOn": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "postedToday": {
+          "type": "boolean"
+        },
+        "timeZone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "nextResetAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "isAnonymous": {
+          "type": "boolean"
+        }
+      }
+    },
+    "PostingStreakResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/PostingStreak"
+        }
+      }
+    },
+    "AnonymousSession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName",
+        "avatarUrl",
+        "isAnonymous"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "displayName": {
+          "const": "Anonymous"
+        },
+        "avatarUrl": {
+          "type": "null"
+        },
+        "isAnonymous": {
+          "const": true
+        }
+      }
+    },
+    "AnonymousSessionResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnonymousSession"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
     }
   }
 }

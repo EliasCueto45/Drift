@@ -37,7 +37,7 @@ export type Position = [Longitude, Latitude];
  */
 export type LinearRing = [Position, Position, Position, Position, ...Position[]];
 /**
- * Verified Clerk user ID
+ * Verified Clerk user ID or server-issued anonymous browser ID
  */
 export type Id1 = string;
 
@@ -66,6 +66,10 @@ export interface DriftContracts {
   MessagesResponse?: MessagesResponse;
   CreateMessageRequest?: CreateMessageRequest;
   CreateCloudRequest?: CreateCloudRequest;
+  PostingStreak?: PostingStreak;
+  PostingStreakResponse?: PostingStreakResponse;
+  AnonymousSession?: AnonymousSession;
+  AnonymousSessionResponse?: AnonymousSessionResponse;
 }
 /**
  * This interface was referenced by `DriftContracts`'s JSON-Schema
@@ -177,6 +181,7 @@ export interface Message {
   version: number;
   cloudId: Id;
   authorId: Id;
+  author?: User;
   kind: "text" | "audio" | "song" | "drawing" | "png";
   anchor: Anchor;
   createdAt: Timestamp;
@@ -313,4 +318,44 @@ export interface CreateMessageRequest {
 export interface CreateCloudRequest {
   outline: Polygon;
   assumedAltitudeM: 2000;
+  datasetId?: Id;
+}
+/**
+ * This interface was referenced by `DriftContracts`'s JSON-Schema
+ * via the `definition` "PostingStreak".
+ */
+export interface PostingStreak {
+  currentDays: number;
+  longestDays: number;
+  totalPostingDays: number;
+  totalPosts: number;
+  lastPostedOn: string | null;
+  postedToday: boolean;
+  timeZone: string;
+  nextResetAt: Timestamp;
+  isAnonymous: boolean;
+}
+/**
+ * This interface was referenced by `DriftContracts`'s JSON-Schema
+ * via the `definition` "PostingStreakResponse".
+ */
+export interface PostingStreakResponse {
+  data: PostingStreak;
+}
+/**
+ * This interface was referenced by `DriftContracts`'s JSON-Schema
+ * via the `definition` "AnonymousSession".
+ */
+export interface AnonymousSession {
+  id: Id;
+  displayName: "Anonymous";
+  avatarUrl: null;
+  isAnonymous: true;
+}
+/**
+ * This interface was referenced by `DriftContracts`'s JSON-Schema
+ * via the `definition` "AnonymousSessionResponse".
+ */
+export interface AnonymousSessionResponse {
+  data: AnonymousSession | null;
 }

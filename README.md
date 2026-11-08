@@ -8,9 +8,9 @@ Repository: https://github.com/EliasCueto45/Drift
 
 ## Status and implementation baseline
 
-The Python API persists to MongoDB Atlas; the Python tracking worker publishes through authenticated endpoints. Shared contracts, deterministic synthetic fixtures, development tooling and tests run in Python. The frontend has not been implemented in this checkout. Numeric defaults below are MVP decisions. Live observations and replay use separate datasets and clocks.
+The Python API persists to MongoDB Atlas; the Python tracking worker publishes through authenticated endpoints. Shared contracts, deterministic synthetic fixtures, development tooling and tests run in Python. The Next.js frontend provides camera/map discovery, cloud creation, text/link posting, voting and Clerk integration; private-media UI still needs integration. Numeric defaults below are MVP decisions. Live observations and replay use separate datasets and clocks.
 
-Architecture: Python 3.12 + FastAPI, PyMongo/Atlas, Clerk session JWT verification, private S3-compatible media storage and the existing Python/OpenCV tracking worker. FastAPI owns public APIs and tracking ingestion. A future browser frontend can consume these HTTP/JSON routes independently. Browser canvas, drawing and Clerk widgets may require browser JavaScript; there is no browser application to convert here yet. See [the Python migration decision](docs/decisions/0003-python-runtime.md).
+Architecture: Python 3.12 + FastAPI, PyMongo/Atlas, Clerk session JWT verification, private S3-compatible media storage and the existing Python/OpenCV tracking worker. FastAPI owns public APIs and tracking ingestion. The Next.js/React browser frontend consumes these HTTP/JSON routes through a same-origin proxy. Browser canvas, drawing and Clerk widgets run in TypeScript/JavaScript; the API and tracking worker run in Python. See [the Python migration decision](docs/decisions/0003-python-runtime.md).
 
 ```text
 Satellite imagery + altitude-aware winds
@@ -46,7 +46,7 @@ docs/decisions/                    reviewed architecture/contract changes
 - **Paste a post.** While aiming at a selected cloud, the user taps the spot to place a post there, writes it, previews it on the cloud, and publishes. The tapped spot becomes the post's geographic anchor on that cloud; do not snap to a centroid. Warn at composition that the anchor is publicly discoverable.
 - **Everyone sees the same placement.** Posts render on the same cloud and spot for every viewer, seen from each viewer's own position and direction. As the cloud drifts, its posts move with it and become visible to people under its new position.
 - **Map fallback.** When the camera or motion sensors are unavailable or denied (desktop, permission refused, unsupported browser), show the same clouds and posts on a 2D sky map with the same select, open, and post actions. Keyboard activation works in this view.
-- Anonymous users can browse. Clerk sign-in is required to post, upload, create clouds, or vote. Display authors by public profile, never email or GPS history.
+- People can browse, post text/links and create clouds without an account using a server-issued anonymous browser session, labeled **Anonymous**. Clerk sign-in is required to vote or upload media. Posting streaks count successful messages on consecutive local calendar days; see [anonymous sessions and streaks](docs/decisions/0005-anonymous-posting-and-local-streaks.md). Display authors by public profile, never email or GPS history.
 - Filter previews by proximity first, then sort by upvotes descending, creation time descending, ID ascending. Expanded view defaults to a paginated **Nearby** tab; an explicit **All in cloud** tab exposes the rest. No limit on total messages per cloud; paginate responses.
 - One upvote per user/message. Tapping again removes it. Counts are authoritative on the server; optimistic UI must reconcile or roll back. Popularity never extends content lifetime.
 - Post types: **text**, **link**, and **image**. In contract v1 these map to message kinds `text`, `song` (an allowlisted HTTPS link), and `png`. Images support positioning, scaling, rotation, and alpha transparency, are clipped to the cloud boundary, and move with local cloud motion. The v1 `audio` and `drawing` kinds are out of the MVP UI; see `docs/decisions/0002-camera-ar-pivot.md`.
@@ -65,7 +65,7 @@ docs/decisions/                    reviewed architecture/contract changes
 | Night | Use appropriate infrared/cloud-mask data; visible-image darkness is not disappearance. |
 | Missing data | Show **Estimated** or **Stale**. Stop extrapolating after 30 minutes; never treat an outage as dissipation. |
 
-Created clouds are independent synthetic objects: they never automatically merge with observed clouds or each other. Overlapping layers must be selectable. Use an assumed altitude of 2 km, labeled as estimated. Creator deletion expires its contents; editing its published outline is outside the MVP. Anyone signed in can post to it.
+Created clouds are independent synthetic objects: they never automatically merge with observed clouds or each other. Overlapping layers must be selectable. Use an assumed altitude of 2 km, labeled as estimated. Creator deletion expires its contents; editing its published outline is outside the MVP. Anyone with a Clerk or anonymous posting session can post to it.
 
 A created outline is a simple geographic polygon with 3–256 distinct vertices, no self-intersections, and maximum diameter 10 km. Store geographic geometry, not screen pixels. Drawing a cloud is distinct from uploading image posts. Satellite tracking identifies estimated regions from above, not guaranteed individual clouds visible from the ground.
 
@@ -121,12 +121,14 @@ Public prefix `/api/v1`. Success `{data,nextCursor?}`; error `{error:{code,messa
 
 | Method / route | Contract |
 | --- | --- |
+| `POST /session/anonymous` | Empty `{}` issues/renews an HttpOnly browser cookie; GET restores the public session or returns null. |
+| `GET /me/streak` | Private posting streak for Clerk/guest caller. Send `X-Drift-Time-Zone` with an IANA zone; the server pins the initial zone. |
 | `GET /sky` | Query `lat,lng,radiusM,datasetId,cursor?`; returns clouds with up to three server-ranked nearby previews each, `asOf`, weather, freshness. Max radius 50 km. |
 | `GET /clouds/:id` | Current cloud, lifecycle and successor IDs; expired detail reveals lifecycle metadata only. |
-| `POST /clouds` | Auth; `{outline:Polygon,assumedAltitudeM:2000}`; server validates and assigns creator/expiry. |
+| `POST /clouds` | Clerk or anonymous session; `{outline:Polygon,assumedAltitudeM:2000}`; server validates and assigns creator/expiry. |
 | `DELETE /clouds/:id` | Created cloud's creator only; idempotently expires cloud and content. |
 | `GET /clouds/:id/messages` | `scope=nearby\|all`, nearby requires `lat,lng`; radius default 25 km/max 50 km; cursor/ranking snapshot. |
-| `POST /clouds/:id/messages` | Auth; `{kind,anchor,expectedCloudVersion,body?,assetId?,songUrl?,artworkTransform?,strokes?}`. Server derives author. Text requires body, song requires songUrl, audio/png/drawing require owned ready asset; drawing includes strokes. |
+| `POST /clouds/:id/messages` | Clerk or anonymous session; `{kind,anchor,expectedCloudVersion,body?,assetId?,songUrl?,artworkTransform?,strokes?}`. Server derives author. Text requires body, song requires songUrl, audio/png/drawing require owned ready asset; drawing includes strokes. |
 | `DELETE /messages/:id` | Author only; idempotent; schedules media deletion. |
 | `PUT /messages/:id/upvote` | Auth; `{active:boolean}` sets desired state idempotently; returns current count and viewer vote state. |
 | `POST /assets/upload-url` | Auth; `{kind,mimeType,sizeBytes}` → `{assetId,uploadUrl,expiresAt}`; pending asset owned by caller. |
@@ -141,7 +143,7 @@ Upload URLs expire after five minutes; media playback URLs after one minute, bou
 ### Persistence and Clerk
 
 - MongoDB replica-set transactions, unique/2dsphere indexes and historical snapshots keep current state separate from history. Atlas supplies the replica set; standalone MongoDB cannot run these transactions.
-- Clerk is identity authority. Python verifies RS256 session signatures, issuer, expiry and authorized browser origin before deriving the public profile. Never trust user IDs in request bodies. Frontend sign-in/provider integration remains to be built.
+- Clerk is the registered-account identity authority; server-issued anonymous sessions authorize only posting/cloud creation and ownership deletion. Python verifies RS256 session signatures, issuer, expiry and authorized browser origin before deriving the public profile. Never trust user IDs in request bodies. The frontend uses the Clerk provider and same-origin API proxy.
 - Enforce ownership on every mutation and asset completion. Clerk browser sessions never authorize worker routes. Atomic unique vote rows prevent retry inflation.
 - Expiry immediately removes content from API reads, rankings, and new media authorizations. Queue cleanup transactionally. Retry deletion of media, strokes, votes and payload rows within 24 hours; retain only non-content lineage metadata. Avoid logging message bodies. Document backup retention before production; app disappearance does not imply immediate backup erasure.
 - Initial per-user limits: 10 posts/minute, 60 vote changes/minute. Request geolocation explicitly and support manual location. Warn at composition that the content anchor is discoverable; never publish a user's location trail.
@@ -198,7 +200,7 @@ PR into main with behavior summary, contract impact, validation, and handoff lin
 
 ### Local Python setup
 
-Prerequisites: Python 3.12 and Git. Use Atlas for persistence; Docker is optional for local MongoDB/media and needed by the documented CI replica-set test setup. Node and pnpm are no longer required.
+Prerequisites: Python 3.12 and Git. Use Atlas for persistence; Docker is optional for local MongoDB/media and needed by the documented CI replica-set test setup. Node 22.12+ is also needed to run the frontend; see [web setup](apps/web/README.md).
 
 ```sh
 python -m venv .venv
@@ -213,7 +215,7 @@ python -m drift_api.cli prepare
 python -m drift_api.cli serve
 ```
 
-The API listens on `http://127.0.0.1:3000`; it does not yet serve a frontend. Root `.env` and `apps/web/.env.local` load automatically, with explicit environment variables taking precedence. Configure `MONGODB_URI`, `MONGODB_DB`, Clerk public/secret keys, `TRACKING_INGEST_SECRET`, `DRIFT_DATASET_ID` and private S3 settings. Existing local credentials remain usable. See [database setup](docs/DATABASE.md) for provisioning and media checks, and [worker setup](services/cloud-worker/README.md) for publishing. Prepare only creates synthetic fixtures and an isolated `*-demo` replay dataset; live provisioning is explicit.
+The API listens on `http://127.0.0.1:3000`; the Next.js frontend runs separately on port 3001 and proxies `/api` to it. Root `.env` and `apps/web/.env.local` load automatically, with explicit environment variables taking precedence. Configure `MONGODB_URI`, `MONGODB_DB`, Clerk public/secret keys, `TRACKING_INGEST_SECRET`, `DRIFT_DATASET_ID` and private S3 settings. Existing local credentials remain usable. See [database setup](docs/DATABASE.md) for provisioning and media checks, and [worker setup](services/cloud-worker/README.md) for publishing. Prepare only creates synthetic fixtures and an isolated `*-demo` replay dataset; live provisioning is explicit.
 
 ```sh
 python -m drift_tools.cli check-contracts

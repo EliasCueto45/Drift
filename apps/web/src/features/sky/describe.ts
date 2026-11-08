@@ -52,7 +52,7 @@ export function freshnessText(freshness: Freshness | null, asOf: string | null, 
 export function statusNote(cloud: Cloud): string | null {
   if (cloud.kind === "created") {
     const left = cloud.expiresAt ? Math.max(0, (Date.parse(cloud.expiresAt) - Date.now()) / 3600000) : null;
-    return `Created cloud${left !== null ? ` · fades in ${left < 1 ? "under an hour" : `${Math.round(left)} h`}` : ""}`;
+    return `Created cloud${cloud.creatorId?.startsWith("anon_") ? " · Anonymous" : ""}${left !== null ? ` · fades in ${left < 1 ? "under an hour" : `${Math.round(left)} h`}` : ""}`;
   }
   if (cloud.status === "uncertain") return "Position uncertain: tracking lost sight of it";
   if (cloud.confidence < 0.5) return "Low-confidence match";

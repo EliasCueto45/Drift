@@ -4,6 +4,7 @@ import { useLatest } from "@/lib/useLatest";
 import { DriftApiError, type DriftApi } from "@/lib/api/client";
 import type { Anchor, CloudWithPreviews, SkyData } from "@/lib/contracts";
 import { DISCOVERY_RADIUS_M } from "./discovery";
+import { usePosts } from "@/features/composer/posts";
 
 export interface SkyState {
   clouds: CloudWithPreviews[];
@@ -14,14 +15,29 @@ export interface SkyState {
   fetchedAt: number | null;
 }
 
-const EMPTY: SkyState = { clouds: [], asOf: null, freshness: null, status: "idle", error: null, fetchedAt: null };
+const EMPTY: SkyState = {
+  clouds: [],
+  asOf: null,
+  freshness: null,
+  status: "idle",
+  error: null,
+  fetchedAt: null,
+};
 const MAX_PAGES = 4;
 
 /** Polls `GET /sky` around the viewer. Keeps the last good data visible when a refresh fails. */
-export function useSky(api: DriftApi, at: Anchor | null, datasetId: string, intervalMs = 15000) {
+export function useSky(
+  api: DriftApi,
+  at: Anchor | null,
+  datasetId: string,
+  intervalMs = 15000,
+) {
+  const { reconcile } = usePosts();
   const [state, setState] = useState<SkyState>(EMPTY);
   const [tick, setTick] = useState(0);
-  const atKey = at ? `${at.latitude.toFixed(4)},${at.longitude.toFixed(4)}` : null;
+  const atKey = at
+    ? `${at.latitude.toFixed(4)},${at.longitude.toFixed(4)}`
+    : null;
   const atRef = useLatest(at);
 
   useEffect(() => {
@@ -35,12 +51,17 @@ export function useSky(api: DriftApi, at: Anchor | null, datasetId: string, inte
         const clouds: CloudWithPreviews[] = [];
         let first: SkyData | null = null;
         for (let page = 0; page < MAX_PAGES; page++) {
-          const res = await api.sky({ at: where, radiusM: DISCOVERY_RADIUS_M, datasetId, cursor }, controller.signal);
+          const res = await api.sky(
+            { at: where, radiusM: DISCOVERY_RADIUS_M, datasetId, cursor },
+            controller.signal,
+          );
           first ??= res.data;
           clouds.push(...res.data.clouds);
           cursor = res.nextCursor;
           if (!cursor) break;
         }
+        await reconcile(clouds, controller.signal);
+        if (controller.signal.aborted) return;
         setState({
           clouds,
           asOf: first?.asOf ?? null,
@@ -51,12 +72,15 @@ export function useSky(api: DriftApi, at: Anchor | null, datasetId: string, inte
         });
       } catch (error) {
         if (controller.signal.aborted) return;
-        const e = error instanceof DriftApiError ? error : new DriftApiError(0, "UNKNOWN", "Couldn't load the sky");
+        const e =
+          error instanceof DriftApiError
+            ? error
+            : new DriftApiError(0, "UNKNOWN", "Couldn't load the sky");
         setState((s) => ({ ...s, status: "error", error: e }));
       }
     })();
     return () => controller.abort();
-  }, [api, atKey, atRef, datasetId, tick]);
+  }, [api, atKey, atRef, datasetId, tick, reconcile]);
 
   useEffect(() => {
     if (!atKey) return;
@@ -68,8 +92,11 @@ export function useSky(api: DriftApi, at: Anchor | null, datasetId: string, inte
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
   /** Apply a local change (new post, vote) without waiting for the next poll. */
-  const patch = useCallback((fn: (clouds: CloudWithPreviews[]) => CloudWithPreviews[]) => {
-    setState((s) => ({ ...s, clouds: fn(s.clouds) }));
-  }, []);
+  const patch = useCallback(
+    (fn: (clouds: CloudWithPreviews[]) => CloudWithPreviews[]) => {
+      setState((s) => ({ ...s, clouds: fn(s.clouds) }));
+    },
+    [],
+  );
   return { ...state, refresh, patch };
 }

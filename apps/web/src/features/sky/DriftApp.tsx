@@ -1,16 +1,32 @@
 "use client";
-import { ArrowLeft, ArrowRight, Camera, Cloud as CloudIcon, Compass, Map as MapIcon, Orbit, ScanLine, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  Cloud as CloudIcon,
+  Compass,
+  Map as MapIcon,
+  Orbit,
+  ScanLine,
+  X,
+} from "lucide-react";
 import { isValidElement } from "react";
 import { captureSkyScreenshot } from "./screenshot";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "@/lib/api/ApiProvider";
-import { AccountButton } from "@/lib/auth/DriftAuth";
+import { AccountButton, useDriftAuth } from "@/lib/auth/DriftAuth";
 import { config } from "@/lib/config";
-import type { Anchor, Message } from "@/lib/contracts";
+import type {
+  Anchor,
+  Cloud,
+  CloudWithPreviews,
+  Message,
+} from "@/lib/contracts";
 import { Composer } from "@/features/composer/Composer";
 import { usePosts } from "@/features/composer/posts";
 import { CloudPanel } from "./CloudPanel";
 import { CloudSheet } from "./CloudSheet";
+import { CloudCreator } from "./CloudCreator";
 import { freshnessText } from "./describe";
 import { DISCOVERY_RADIUS_M, placementInRange } from "./discovery";
 import { directionTo, groundDistanceM, ringCentroid } from "./geo";
@@ -26,7 +42,12 @@ import {
   useWatchedLocation,
   type ViewerLocation,
 } from "./sensors";
-import { SkyStage, type Draft, type RegistrationReport, type SceneSummary } from "./SkyStage";
+import {
+  SkyStage,
+  type Draft,
+  type RegistrationReport,
+  type SceneSummary,
+} from "./SkyStage";
 import { useSky } from "./useSky";
 import { nightOutdoorScore, outdoorScore, sunElevationDeg, VisibilityTracker, type CloudVisibility } from "./visibility";
 import { classifyFrame, loadSceneModel, type SceneResult } from "./sceneClassifier";
@@ -35,6 +56,7 @@ import { DebugHud, type DebugSnapshot } from "@/features/debug/DebugHud";
 import { setDeveloperMode, useDeveloperMode } from "@/features/debug/mode";
 import { remoteLog, startRemoteLog, stopRemoteLog } from "@/features/debug/remoteLog";
 import styles from "./sky.module.css";
+import { PostingStreakBadge } from "@/features/composer/PostingStreakBadge";
 
 type View = "welcome" | "camera" | "simulated" | "map";
 
@@ -64,7 +86,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     }
   }
   const api = useApi();
-  const { notice, notify, addCreated } = usePosts();
+  const auth = useDriftAuth();
+  const { notice, notify, addCreated, removed, removedClouds } = usePosts();
   const synthetic = config.isSyntheticDataset(datasetId);
 
   const [view, setView] = useState<View>(initialView ?? "welcome");
@@ -77,7 +100,33 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
   const viewer: Anchor = location ?? config.simulatedViewer;
   const viewerIsReal = Boolean(location);
-  const { clouds, status: skyStatus, freshness, asOf, refresh: refreshSky } = useSky(api, viewer, datasetId);
+  const {
+    clouds: receivedClouds,
+    status: skyStatus,
+    freshness,
+    asOf,
+    refresh: refreshSky,
+    patch: patchSky,
+  } = useSky(api, viewer, datasetId);
+  const clouds: CloudWithPreviews[] = receivedClouds
+    .filter((c) => !removedClouds.has(c.cloud.id))
+    .map((c) => ({
+      ...c,
+      previews: c.previews.filter(
+        (m) => !removed.has(m.id),
+      ) as CloudWithPreviews["previews"],
+    }));
+  const [creatingCloud, setCreatingCloud] = useState(false);
+  function onCloudCreated(cloud: Cloud) {
+    patchSky((items) => [
+      { cloud, previews: [] },
+      ...items.filter((c) => c.cloud.id !== cloud.id),
+    ]);
+    setCreatingCloud(false);
+    setSelectedId(cloud.id);
+    notify("Created cloud published. It expires in 24 hours in this sky.");
+    refreshSky();
+  }
   const handheld = useMediaQuery("(pointer: coarse)", true);
 
   // Selection, placement and composing.
@@ -97,9 +146,17 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     stopStream(streamRef.current);
     setStream(null);
     setView("map");
-    notify("This device isn't reporting a compass heading, so here's the map instead.");
+    notify(
+      "This device isn't reporting a compass heading, so here's the map instead.",
+    );
   });
-  const sim = useRef({ az: 30, el: 24, aimed: false, lifted: false, liftDeg: 0 });
+  const sim = useRef({
+    az: 30,
+    el: 24,
+    aimed: false,
+    lifted: false,
+    liftDeg: 0,
+  });
   // Behind the welcome sheet the camera tilts down a little so the cloud sits above the sheet;
   // entering the sky view recenters it on the reticle.
   /**
@@ -111,7 +168,9 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     const w = window.innerWidth;
     const h = window.innerHeight;
     const hfov = visibleHfovDeg({ width: w, height: h }, null);
-    const vfov = (2 * Math.atan(Math.tan((hfov * Math.PI) / 360) * (h / w)) * 180) / Math.PI;
+    const vfov =
+      (2 * Math.atan(Math.tan((hfov * Math.PI) / 360) * (h / w)) * 180) /
+      Math.PI;
     return { frame: vfov * 0.11, welcome: w < 700 ? vfov * 0.12 : 0 };
   };
   const tween = useRef(0);
@@ -155,18 +214,33 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     // Prefer a cloud with posts that is far enough away to be seen as a cloud, not fog overhead.
     const ranked = clouds
       .map((c) => {
-        const centroid = ringCentroid((c.cloud.geometry.coordinates[0]?.[0] ?? []) as number[][]);
+        const centroid = ringCentroid(
+          (c.cloud.geometry.coordinates[0]?.[0] ?? []) as number[][],
+        );
         return { c, centroid, d: groundDistanceM(viewer, centroid) };
       })
-      .sort((a, b) => Number(b.c.previews.length > 0 && b.d > 3000) - Number(a.c.previews.length > 0 && a.d > 3000) || a.d - b.d);
+      .sort(
+        (a, b) =>
+          Number(b.c.previews.length > 0 && b.d > 3000) -
+            Number(a.c.previews.length > 0 && a.d > 3000) || a.d - b.d,
+      );
     const target = ranked[0];
     if (!target) return;
-    const dir = directionTo({ ...viewer, height: 0 }, { ...target.centroid, height: target.c.cloud.wind.altitudeM || 2000 });
+    const dir = directionTo(
+      { ...viewer, height: 0 },
+      { ...target.centroid, height: target.c.cloud.wind.altitudeM || 2000 },
+    );
     // The camera looks a little below the cloud so it sits in the upper third, clear of the panel.
     const t = tilts();
     const el = Math.min(70, Math.max(8, dir.elevationDeg)) - t.frame;
     const lifted = view === "welcome";
-    sim.current = { az: dir.azimuthDeg, el: lifted ? el - t.welcome : el, aimed: true, lifted, liftDeg: lifted ? t.welcome : 0 };
+    sim.current = {
+      az: dir.azimuthDeg,
+      el: lifted ? el - t.welcome : el,
+      aimed: true,
+      lifted,
+      liftDeg: lifted ? t.welcome : 0,
+    };
   }, [clouds, viewer, view]);
 
   const getSimPose = useCallback((): Omit<CameraPose, "hfovDeg"> => {
@@ -185,7 +259,12 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
   // Camera-to-satellite registration (docs/decisions/0004): a smoothed pose correction that
   // lays tracked outlines over the clouds the camera actually sees.
-  const reg = useRef({ az: 0, el: 0, last: null as RegistrationReport | null, matchedAt: 0 });
+  const reg = useRef({
+    az: 0,
+    el: 0,
+    last: null as RegistrationReport | null,
+    matchedAt: 0,
+  });
   const [matched, setMatched] = useState(false);
   const onRegister = useCallback((r: RegistrationReport) => {
     const g = reg.current;
@@ -275,8 +354,18 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     if (!vectors) return null;
     const { viewer: v, nudge: n, declination: d } = live.current;
     const a = poseAngles(vectors, (d ?? 0) + n + reg.current.az);
-    a.elevationDeg = Math.max(-89, Math.min(89, a.elevationDeg + reg.current.el));
-    return { longitude: v.longitude, latitude: v.latitude, heightM: 0, heightReference: "unknown", ...a, source: "sensors" };
+    a.elevationDeg = Math.max(
+      -89,
+      Math.min(89, a.elevationDeg + reg.current.el),
+    );
+    return {
+      longitude: v.longitude,
+      latitude: v.latitude,
+      heightM: 0,
+      heightReference: "unknown",
+      ...a,
+      source: "sensors",
+    };
   };
 
   const panSim = useCallback((dAz: number, dEl: number) => {
@@ -286,7 +375,11 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
   // Welcome screen: slow drift of the simulated sky behind the sheet.
   useEffect(() => {
-    if (view !== "welcome" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (
+      view !== "welcome" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -301,15 +394,30 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   useEffect(() => () => stopStream(stream), [stream]);
 
   // ---- Debug readout (?debug=1) ----
-  const perms = useRef<{ motion: string; camera: string; location: string }>({ motion: "-", camera: "-", location: "-" });
+  const perms = useRef<{ motion: string; camera: string; location: string }>({
+    motion: "-",
+    camera: "-",
+    location: "-",
+  });
   const rate = useRef({ count: 0, at: 0, hz: 0 });
   const debugSnapshot = (): DebugSnapshot => {
-    const d = { view, location, skyStatus, clouds: clouds.length, summary, declination, nudge, stream };
+    const d = {
+      view,
+      location,
+      skyStatus,
+      clouds: clouds.length,
+      summary,
+      declination,
+      nudge,
+      stream,
+    };
     const r = orientation.reading.current;
     const g = reg.current;
     const now = performance.now();
     if (now - rate.current.at >= 1000) {
-      rate.current.hz = rate.current.at ? ((r.count - rate.current.count) * 1000) / (now - rate.current.at) : 0;
+      rate.current.hz = rate.current.at
+        ? ((r.count - rate.current.count) * 1000) / (now - rate.current.at)
+        : 0;
       rate.current = { count: r.count, at: now, hz: rate.current.hz };
     }
     const pose = d.view === "camera" ? getCameraPose() : null;
@@ -334,10 +442,14 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       roll: pose?.rollDeg ?? null,
       decl: d.declination,
       nudge: d.nudge,
-      gps: d.location ? `${d.location.latitude.toFixed(5)}, ${d.location.longitude.toFixed(5)}` : "simulated",
+      gps: d.location
+        ? `${d.location.latitude.toFixed(5)}, ${d.location.longitude.toFixed(5)}`
+        : "simulated",
       gpsAcc: d.location ? Math.round(d.location.accuracyM) : null,
       video: vw ? `${vw}x${vh}` : null,
-      track: settings ? `${settings.width}x${settings.height} ${settings.facingMode ?? ""} ${settings.frameRate ? Math.round(settings.frameRate) + "fps" : ""}` : null,
+      track: settings
+        ? `${settings.width}x${settings.height} ${settings.facingMode ?? ""} ${settings.frameRate ? Math.round(settings.frameRate) + "fps" : ""}`
+        : null,
       viewport: `${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio}`,
       hfov: visibleHfovDeg({ width: window.innerWidth, height: window.innerHeight }, vw ? { width: vw, height: vh } : null),
       sky: `${d.skyStatus} · ${d.clouds} clouds · ${d.summary?.visible ?? 0} in view`,
@@ -349,8 +461,13 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
         : "loading…",
       reg: g.last ? `${g.last.state}${g.last.accepted ? " +" : ""} ${Math.round(g.last.ms)}ms` : null,
       regFix: `az ${g.az.toFixed(1)} el ${g.el.toFixed(1)}`,
-      regScore: g.last?.score != null ? `${g.last.score.toFixed(2)} (base ${g.last.baseScore?.toFixed(2)})` : null,
-      regMask: g.last ? `cloud ${Math.round(g.last.cloudFraction * 100)}% · sky ${Math.round(g.last.validFraction * 100)}%` : null,
+      regScore:
+        g.last?.score != null
+          ? `${g.last.score.toFixed(2)} (base ${g.last.baseScore?.toFixed(2)})`
+          : null,
+      regMask: g.last
+        ? `cloud ${Math.round(g.last.cloudFraction * 100)}% · sky ${Math.round(g.last.validFraction * 100)}%`
+        : null,
     };
   };
 
@@ -364,7 +481,11 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     const loc = await requestLocationOnce();
     setBusy(false);
     perms.current = { motion, camera: cam.status, location: loc.status };
-    remoteLog("permissions", { ...perms.current, track: cam.stream?.getVideoTracks()[0]?.getSettings() ?? null, location: loc.location });
+    remoteLog("permissions", {
+      ...perms.current,
+      track: cam.stream?.getVideoTracks()[0]?.getSettings() ?? null,
+      location: loc.location,
+    });
     if (loc.location) setGranted(loc.location);
     setLocationOff(loc.status !== "granted");
     // Only the camera is required for the camera view. Missing motion or location degrades
@@ -386,9 +507,13 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     setStream(cam.stream);
     setView("camera");
     if (motion !== "granted") {
-      notify("Motion access is off, so posts can't follow where the phone points. Allow Motion & Orientation in Safari settings.");
+      notify(
+        "Motion access is off, so posts can't follow where the phone points. Allow Motion & Orientation in Safari settings.",
+      );
     } else if (loc.status !== "granted") {
-      notify("Location is off, so positions assume you're in Troy, NY. Turn on Location Services for Safari Websites to fix.");
+      notify(
+        "Location is off, so positions assume you're in Troy, NY. Turn on Location Services for Safari Websites to fix.",
+      );
     }
   }
 
@@ -417,14 +542,23 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   function onTap(id: string | null) {
     if (draft) return;
     setSelectedId(id);
-    const target = id && view === "simulated" ? clouds.find((c) => c.cloud.id === id) : null;
+    const target =
+      id && view === "simulated" ? clouds.find((c) => c.cloud.id === id) : null;
     if (target) {
       // Frame the tapped cloud in the upper third so its caption sheet doesn't cover it.
-      const centroid = ringCentroid((target.cloud.geometry.coordinates[0]?.[0] ?? []) as number[][]);
-      const dir = directionTo({ ...viewer, height: 0 }, { ...centroid, height: target.cloud.wind.altitudeM || 2000 });
+      const centroid = ringCentroid(
+        (target.cloud.geometry.coordinates[0]?.[0] ?? []) as number[][],
+      );
+      const dir = directionTo(
+        { ...viewer, height: 0 },
+        { ...centroid, height: target.cloud.wind.altitudeM || 2000 },
+      );
       const want = Math.max(-5, dir.elevationDeg - tilts().frame);
-      const off = Math.abs(((dir.azimuthDeg - sim.current.az + 540) % 360) - 180);
-      if (Math.abs(sim.current.el - want) > 4 || off > 12) panSimTo(dir.azimuthDeg, want);
+      const off = Math.abs(
+        ((dir.azimuthDeg - sim.current.az + 540) % 360) - 180,
+      );
+      if (Math.abs(sim.current.el - want) > 4 || off > 12)
+        panSimTo(dir.azimuthDeg, want);
     }
   }
   function onPlace(cloudId: string, anchor: Anchor) {
@@ -433,7 +567,9 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       return;
     }
     if (!placementInRange(viewer, anchor)) {
-      notify(`Choose a spot within ${DISCOVERY_RADIUS_M / 1000} km so it appears in your nearby sky.`);
+      notify(
+        `Choose a spot within ${DISCOVERY_RADIUS_M / 1000} km so it appears in your nearby sky.`,
+      );
       return;
     }
     setPlacing(false);
@@ -441,15 +577,29 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     if (view === "simulated") {
       // Bring the chosen spot above the composer so the words can be watched settling in.
       const target = clouds.find((c) => c.cloud.id === cloudId);
-      const dir = directionTo({ ...viewer, height: 0 }, { ...anchor, height: target?.cloud.wind.altitudeM || 2000 });
-      panSimTo(dir.azimuthDeg, Math.max(-5, dir.elevationDeg - tilts().frame * 1.4));
+      const dir = directionTo(
+        { ...viewer, height: 0 },
+        { ...anchor, height: target?.cloud.wind.altitudeM || 2000 },
+      );
+      panSimTo(
+        dir.azimuthDeg,
+        Math.max(-5, dir.elevationDeg - tilts().frame * 1.4),
+      );
     }
-    setDraft((d) => ({ cloudId, anchor, text: d?.cloudId === cloudId ? d.text : "" }));
+    setDraft((d) => ({
+      cloudId,
+      anchor,
+      text: d?.cloudId === cloudId ? d.text : "",
+    }));
   }
   function onPlaceMiss() {
     notify("Tap inside a cloud to place your post.");
   }
-  const onDraftText = useCallback((text: string) => setDraft((d) => (d && d.text !== text ? { ...d, text } : d)), []);
+  const onDraftText = useCallback(
+    (text: string) =>
+      setDraft((d) => (d && d.text !== text ? { ...d, text } : d)),
+    [],
+  );
   function onPublished(m: Message) {
     addCreated(m);
     setSettle({ id: m.id, at: performance.now() });
@@ -494,21 +644,34 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           </button>
         </>
       );
-    } else if (skyStatus === "error" && !clouds.length) hint = <>Can&apos;t reach Drift right now. Retrying…</>;
-    else if (skyStatus === "loading" || skyStatus === "idle") hint = <>Finding clouds near you…</>;
-    else if (skyStatus === "ready" && !clouds.length) hint = <>No tracked clouds within 25 km right now.</>;
+    } else if (skyStatus === "error" && !clouds.length)
+      hint = <>Can&apos;t reach Drift right now. Retrying…</>;
+    else if (skyStatus === "loading" || skyStatus === "idle")
+      hint = <>Finding clouds near you…</>;
+    else if (skyStatus === "ready" && !clouds.length)
+      hint = (
+        <>No tracked clouds within {DISCOVERY_RADIUS_M / 1000} km right now.</>
+      );
     else if (calibrating && view === "camera") {
       hint = (
         <span className={styles.nudge}>
           Line posts up with the clouds
-          <button type="button" aria-label="Turn overlay left 2 degrees" onClick={() => setNudge((n) => n - 2)}>
+          <button
+            type="button"
+            aria-label="Turn overlay left 2 degrees"
+            onClick={() => setNudge((n) => n - 2)}
+          >
             <ArrowLeft size={18} aria-hidden="true" />
           </button>
           <span className="tabular" aria-live="polite">
             {nudge > 0 ? "+" : ""}
             {nudge}°
           </span>
-          <button type="button" aria-label="Turn overlay right 2 degrees" onClick={() => setNudge((n) => n + 2)}>
+          <button
+            type="button"
+            aria-label="Turn overlay right 2 degrees"
+            onClick={() => setNudge((n) => n + 2)}
+          >
             <ArrowRight size={18} aria-hidden="true" />
           </button>
           <button type="button" onClick={() => setCalibrating(false)}>
@@ -520,8 +683,13 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       const t = summary.turn.turnDeg;
       hint = (
         <>
-          {t < 0 ? <ArrowLeft size={18} aria-hidden="true" /> : <ArrowRight size={18} aria-hidden="true" />}
-          Nearest cloud: turn {t < 0 ? "left" : "right"} about {Math.max(5, Math.round(Math.abs(t) / 5) * 5)}°
+          {t < 0 ? (
+            <ArrowLeft size={18} aria-hidden="true" />
+          ) : (
+            <ArrowRight size={18} aria-hidden="true" />
+          )}
+          Nearest cloud: turn {t < 0 ? "left" : "right"} about{" "}
+          {Math.max(5, Math.round(Math.abs(t) / 5) * 5)}°
         </>
       );
     } else if (summary && summary.visible === 0) hint = <>Look higher to find the clouds</>;
@@ -536,8 +704,12 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           </button>
         </>
       );
-    } else if (skyStatus === "ready" && !clouds.length) hint = <>No tracked clouds within 25 km right now.</>;
-    else if (!selected) hint = <>Tap a cloud to read what&apos;s written on it</>;
+    } else if (skyStatus === "ready" && !clouds.length)
+      hint = (
+        <>No tracked clouds within {DISCOVERY_RADIUS_M / 1000} km right now.</>
+      );
+    else if (!selected)
+      hint = <>Tap a cloud to read what&apos;s written on it</>;
   }
 
   return (
@@ -583,6 +755,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
       <header className={styles.topbar}>
         <div className={styles.pills}>
+          {view !== "welcome" && <PostingStreakBadge className={styles.pill} />}
           {/* Five quick taps switch on developer mode (hidden from users on purpose). */}
           <span className={styles.pill} data-tone={fresh.tone} role="status" onClick={onStatusTap}>
             <span className={styles.dot} aria-hidden="true" />
@@ -610,13 +783,34 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           {view === "camera" && !indoorBlocked && (
             <button type="button" className={styles.signInButton} onClick={() => setCalibrating((c) => !c)} aria-pressed={calibrating}>
               <Compass size={16} aria-hidden="true" />
-              {matched && !cloudsHidden ? "Matched to visible clouds" : declination === null ? "Compass uncorrected" : "Approximate positions"}
+              {matched && !cloudsHidden
+                ? "Matched to visible clouds"
+                : declination === null
+                  ? "Compass uncorrected"
+                  : "Approximate positions"}
             </button>
           )}
-          {view === "map" && !viewerIsReal && <span className={styles.pill}>Showing Troy, NY</span>}
-          {view === "camera" && locationOff && !viewerIsReal && <span className={styles.pill}>Location off · assuming Troy, NY</span>}
+          {view === "map" && !viewerIsReal && (
+            <span className={styles.pill}>Showing Troy, NY</span>
+          )}
+          {view === "camera" && locationOff && !viewerIsReal && (
+            <span className={styles.pill}>
+              Location off · assuming Troy, NY
+            </span>
+          )}
+          {view !== "welcome" && !indoorBlocked && !composing && !sheetItem && (
+            <button
+              type="button"
+              className={styles.signInButton}
+              onClick={() => setCreatingCloud(true)}
+            >
+              Draw a cloud
+            </button>
+          )}
         </div>
-        {view !== "welcome" && <AccountButton className={styles.signInButton} />}
+        {view !== "welcome" && (
+          <AccountButton className={styles.signInButton} />
+        )}
       </header>
 
       {notice && (
@@ -661,7 +855,12 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           {/* Keyed by its text: iOS Safari leaves stale glyphs behind a backdrop-filter when text changes in place. */}
           {hint ? <div key={nodeText(hint)} className={styles.hint}>{hint}</div> : <span className={styles.hintSpacer} />}
           {view === "simulated" && (
-            <button type="button" className={styles.roundButton} onClick={() => setView("welcome")} aria-label="Leave the simulated sky">
+            <button
+              type="button"
+              className={styles.roundButton}
+              onClick={() => setView("welcome")}
+              aria-label="Leave the simulated sky"
+            >
               <X size={20} aria-hidden="true" />
             </button>
           )}
@@ -699,7 +898,22 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
         </div>
       )}
 
-      {sheetItem && <CloudSheet item={sheetItem} viewer={viewer} onClose={() => setSheetId(null)} />}
+      {sheetItem && (
+        <CloudSheet
+          key={`${sheetItem.cloud.id}:${auth.userId ?? "anonymous"}`}
+          item={sheetItem}
+          viewer={viewer}
+          onClose={() => setSheetId(null)}
+        />
+      )}
+      {creatingCloud && !indoorBlocked && (
+        <CloudCreator
+          viewer={viewer}
+          datasetId={datasetId}
+          onCreated={onCloudCreated}
+          onClose={() => setCreatingCloud(false)}
+        />
+      )}
 
       {debug && <DebugHud snapshot={debugSnapshot} />}
       {/* User mode: hide the Next.js dev error overlay and issue badge (dev server only). */}
