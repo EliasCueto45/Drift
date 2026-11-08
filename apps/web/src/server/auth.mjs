@@ -20,6 +20,24 @@ export async function clerkIdentity(required = false) {
   const user = await (await clerkClient()).users.getUser(userId);
   return { id: userId, displayName: user.username ?? ([user.firstName, user.lastName].filter(Boolean).join(' ') || null), avatarUrl: user.imageUrl ?? null };
 }
+// The standalone API verifies the same Clerk sessions as the Next adapter.
+// Anonymous reads need no Clerk network request or configured secret key.
+export async function requestIdentity(required,request){
+  const authorization=request.headers.get('authorization');
+  const sessionCookie=/(?:^|;\s*)__session=/.test(request.headers.get('cookie')??'');
+  if(!authorization&&!sessionCookie){if(required)fail(401,'UNAUTHENTICATED','Sign in required');return null;}
+  if(authorization&&!/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(authorization))fail(401,'UNAUTHENTICATED','Valid Clerk session required');
+  if(!process.env.CLERK_SECRET_KEY)fail(503,'NOT_CONFIGURED','Set the complete CLERK_SECRET_KEY in apps/web/.env.local');
+  const {createClerkClient}=await import('@clerk/backend');
+  const client=createClerkClient({secretKey:process.env.CLERK_SECRET_KEY,publishableKey:process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY});
+  let state;
+  try{state=await client.authenticateRequest(request,{authorizedParties:[process.env.DRIFT_APP_ORIGIN||new URL(request.url).origin],acceptsToken:'session_token'});}
+  catch{fail(401,'UNAUTHENTICATED','Valid Clerk session required');}
+  const userId=state.toAuth()?.userId;
+  if(!userId){if(required)fail(401,'UNAUTHENTICATED','Sign in required');return null;}
+  const user=await client.users.getUser(userId);
+  return {id:userId,displayName:user.username??([user.firstName,user.lastName].filter(Boolean).join(' ')||null),avatarUrl:user.imageUrl??null};
+}
 export function checkOrigin(request) {
   const origin = request.headers.get('origin');
   if (origin) requireThat(origin === new URL(request.url).origin, 'Cross-origin mutation forbidden', 'FORBIDDEN', 403);

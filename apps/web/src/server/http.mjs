@@ -36,7 +36,7 @@ export function createHandler({identity=clerkIdentity,run=transaction,worker=wor
       } else {
         const writes=['POST','PUT','DELETE'].includes(method);
         if(writes) checkOrigin(request);
-        const user=await identity(writes);
+        const user=await identity(writes,request);
         if(writes && !user) fail(401,'UNAUTHENTICATED','Sign in required');
         if(path==='/api/v1/sky' && method==='GET') fn=db=>sky(db,url.searchParams,user);
         else if(path==='/api/v1/clouds' && method==='POST') {const body=await readJson(request); fn=db=>createCloud(db,body,user);status=201;}

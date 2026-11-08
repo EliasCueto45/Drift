@@ -4,8 +4,17 @@ import sharp from "sharp";
 import { validate } from "../validation.mjs";
 import { inspectMedia,uploadInput } from "../storage.mjs";
 import { workerAuth } from "../auth.mjs";
+import { requestIdentity } from "../auth.mjs";
 import { createHandler,readJson } from "../http.mjs";
 const text={"kind":"text","body":"hello","anchor":{"longitude":-73.7,"latitude":42.7},"expectedCloudVersion":1};
+test('standalone auth allows anonymous reads and rejects missing, forged and worker identities',async()=>{
+  assert.equal(await requestIdentity(false,new Request('http://localhost:3000/api/v1/sky')),null);
+  await assert.rejects(requestIdentity(true,new Request('http://localhost:3000/api/v1/clouds')),{status:401});
+  await assert.rejects(requestIdentity(true,new Request('http://localhost:3000/api/v1/clouds',{headers:{authorization:'Bearer worker-secret'}})),{status:401});
+  const previous=process.env.CLERK_SECRET_KEY;delete process.env.CLERK_SECRET_KEY;
+  try{await assert.rejects(requestIdentity(true,new Request('http://localhost:3000/api/v1/clouds',{headers:{authorization:'Bearer fake.jwt.signature'}})),{status:503});}
+  finally{if(previous!==undefined)process.env.CLERK_SECRET_KEY=previous;}
+});
 test('real PNG decoding strips metadata and rejects forged or oversized media',async()=>{
   const bytes=await sharp({create:{width:4,height:4,channels:4,background:{r:10,g:20,b:30,alpha:0.5}}}).withMetadata({exif:{IFD0:{Artist:'private metadata'}}}).png().toBuffer();
   const result=await inspectMedia(bytes,{kind:'png',mimeType:'image/png'});
