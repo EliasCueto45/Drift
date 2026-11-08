@@ -176,6 +176,43 @@ test('MongoDB replica-set persistence and backend integration',async t=>{
       await assert.rejects(run(db=>ingest(db,foreign)),{status:422});
       assert.equal((await get(context,'datasets','fx-scattered')).sequence,2);
     });
+    await t.test('independent MongoDB sessions serialize concurrent votes without inflation',async()=>{
+      let message;
+      await run(async db=>{
+        const c=(await get(db,'clouds','cld_scat_b')).payload;
+        const anchor={longitude:c.geometry.coordinates[0][0][0][0]+0.005,latitude:c.geometry.coordinates[0][0][0][1]+0.005};
+        message=(await createMessage(db,c.id,{kind:'text',body:'concurrent voting',anchor,expectedCloudVersion:c.version},bob)).data;
+      });
+      const users=Array.from({length:12},(_,i)=>({id:`concurrent-${i}`,displayName:null,avatarUrl:null}));
+      const vote=(user,active)=>run(async db=>{await upsertProfile(db,user);return upvote(db,message.id,{active},user);});
+      await Promise.all(users.map(user=>vote(user,true)));
+      await Promise.all(users.map(user=>vote(user,true)));
+      assert.equal(await collection(context,'votes').countDocuments({message_id:message.id}),12);
+      await Promise.all(users.slice(0,6).map(user=>vote(user,false)));
+      assert.equal(await collection(context,'votes').countDocuments({message_id:message.id}),6);
+      assert.equal((await get(context,'messages',message.id)).payload.version,1);
+    });
+    await t.test('simultaneous post and retirement either transfer conflict or reject the late post',async()=>{
+      let cloud,anchor;
+      await run(async db=>{
+        const base=(await get(db,'clouds','cld_scat_a')).payload;
+        cloud={...base,id:'concurrency-cloud',version:1,datasetId:'concurrency-demo',trackingRunId:'run',parentIds:[]};
+        anchor={longitude:base.geometry.coordinates[0][0][0][0]+0.005,latitude:base.geometry.coordinates[0][0][0][1]+0.005};
+        await collection(db,'datasets').insertOne({_id:cloud.datasetId,id:cloud.datasetId,mode:'replay',run_id:'run',sequence:0,observed_at:new Date(cloud.updatedAt),received_at:db.now});
+        await saveCloud(db,cloud);
+      });
+      const retirement={schemaVersion:1,batchId:'concurrent-retire',datasetId:cloud.datasetId,trackingRunId:'run',sequence:1,observedAt:cloud.updatedAt,snapshots:[{...cloud,status:'expired',version:2}],events:[],anchorUpdates:[]};
+      const [post,retire]=await Promise.allSettled([
+        run(db=>createMessage(db,cloud.id,{kind:'text',body:'racing retirement',anchor,expectedCloudVersion:1},bob)),
+        run(db=>ingest(db,retirement)),
+      ]);
+      assert.ok(post.status==='fulfilled'||retire.status==='fulfilled');
+      if(post.status==='fulfilled'){
+        assert.equal(retire.status,'rejected');assert.equal(retire.reason.code,'VERSION_CONFLICT');
+        assert.equal((await get(context,'clouds',cloud.id)).payload.status,'active');
+        assert.equal(await collection(context,'messages').countDocuments({cloud_id:cloud.id,expired_at:null}),1);
+      }else{assert.equal(post.reason.status,410);assert.equal((await get(context,'clouds',cloud.id)).payload.status,'expired');}
+    });
     await t.test('created cloud geometry, ownership, expiry and cleanup',async()=>{
       process.env.DRIFT_DATASET_ID='fx-clear';
       const ds=await get(context,'datasets','fx-clear');
