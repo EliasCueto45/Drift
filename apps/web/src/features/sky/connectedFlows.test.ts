@@ -80,9 +80,9 @@ const post = {
 describe("connected author and cloud controls", () => {
   it("shows the latest tracked displacement beside the post age", () => {
     const view = render(createElement(PostItem, { message: { ...post, driftDistanceM: 1234 } }));
-    expect(screen.getByText("drifted ~1.2 km").parentElement?.textContent).toContain("just now");
+    expect(screen.getByText("drifted from 1.2 km away").parentElement?.textContent).toContain("just now · drifted from 1.2 km away");
     view.rerender(createElement(PostItem, { message: { ...post, driftDistanceM: null } }));
-    expect(screen.getByText("drift unavailable")).toBeTruthy();
+    expect(screen.getByText("drift distance unavailable")).toBeTruthy();
   });
   it("posts anonymously without opening sign-up", async () => {
     mocks.auth.signedIn = false;
