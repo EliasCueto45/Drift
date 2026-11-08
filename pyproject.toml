@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "drift"
 version = "0.2.0"
 requires-python = ">=3.12,<3.14"
-dependencies = ["fastapi", "uvicorn", "pymongo>=4.10,<5", "PyJWT[crypto]", "httpx", "boto3", "shapely>=2", "pyproj", "av", "Pillow", "jsonschema", "rfc3339-validator", "python-dotenv"]
+dependencies = ["fastapi", "uvicorn", "pymongo>=4.10,<5", "PyJWT[crypto]", "httpx", "boto3", "shapely>=2", "pyproj", "av", "Pillow", "jsonschema", "rfc3339-validator", "python-dotenv", "tzdata"]
 
 [project.optional-dependencies]
 test = ["pytest", "ruff", "mypy", "httpx2"]
