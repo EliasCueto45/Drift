@@ -54,6 +54,7 @@ def seed_fixtures(run):
                         "asset_id": message["assetId"],
                         "payload": message,
                         "anchor": point_geometry(message["anchor"]),
+                        "initial_anchor": dict(message["anchor"]),
                         "position_at": timestamp(message["updatedAt"]),
                         "expired_at": None,
                         "held": False,
