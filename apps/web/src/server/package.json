@@ -1,13 +1,12 @@
 {
   "name": "@drift/backend",
   "private": true,
-  "engines": {
-    "node": ">=22.18.0"
-  },
+  "engines": { "node": ">=22.18.0" },
   "type": "module",
   "scripts": {
     "start": "node serve.mjs",
     "config:check": "node config-check.mjs",
+    "clerk:check": "node ../../../../db/check-clerk.mjs",
     "db:check": "node ../../../../db/check.mjs",
     "db:prepare": "node ../../../../db/prepare.mjs",
     "smoke:atlas": "node ../../../../db/smoke.mjs",
