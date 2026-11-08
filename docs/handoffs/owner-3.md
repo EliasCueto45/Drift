@@ -1,5 +1,13 @@
 # Owner 3 — Tracking
 
+## Current-real-sky MVP requirement
+
+The final hackathon product must use current sky observations. Added `python -m cloud_worker.live` for continuous automatic NOAA catalog discovery and polling, plus `--once` for diagnostics. Default Troy live dataset/state are distinct from replay. Selects recent masks, height/IR where co-timed, and altitude-aware DMW; rejects stale/future masks and never falls back to fixtures. Acquisition failures retain state/content; ingest errors stop with the durable journal intact. New acquisition tests plus existing worker/shared integration suite: 37 passed with warnings as errors. Missing five-minute acquisitions reset clear-sky evidence before further expiry decisions.
+
+Real current-sky smoke passed: discovered at 2026-11-08 00:38:32 UTC (Nov 7, 7:38 p.m. Eastern), processed masks at 00:26:18.3 and 00:31:18.3 UTC plus matching ACHAC/C13 and earlier DMWC. Two validated live batches emitted locally, dataset troy-live; no backend publishing attempted. Post-download age is also checked before live delivery. Current manifest/source provenance and diagnostics are ignored local artifacts, not generated shared fixtures.
+
+Owner 2 exact request: connect this supervisor's `--publish` to persistent ingestion/state endpoints and preserve observation timestamps/uncertainty. Owner 1 exact request: use `troy-live`, display observation age and estimated/stale status, and verify current satellite movement reaches the browser. Local acquisition status is diagnostic only; no shared contract changes. Replay remains rehearsal, not the final demo. Full live browser acceptance awaits the backend/UI.
+
 CI correction: the Python job invokes the shared Node smoke suite, so it now explicitly provisions Node 22/pnpm and installs the frozen workspace dependencies. The previous isolated runner failed with `ERR_MODULE_NOT_FOUND: ajv`; local node_modules had masked this setup omission. Integration tests remain enabled.
 
 ## Integration update after pulling main (`902219c`)
