@@ -124,6 +124,7 @@
         "version": { "type": "integer", "minimum": 1 },
         "cloudId": { "$ref": "#/$defs/Id" },
         "authorId": { "$ref": "#/$defs/Id" },
+        "author": { "$ref": "#/$defs/User" },
         "kind": { "enum": ["text", "audio", "song", "drawing", "png"] },
         "anchor": { "$ref": "#/$defs/Anchor" },
         "createdAt": { "$ref": "#/$defs/Timestamp" },
@@ -265,7 +266,8 @@
       "required": ["outline", "assumedAltitudeM"],
       "properties": {
         "outline": { "$ref": "#/$defs/Polygon" },
-        "assumedAltitudeM": { "const": 2000 }
+        "assumedAltitudeM": { "const": 2000 },
+        "datasetId": { "$ref": "#/$defs/Id" }
       },
       "not": { "anyOf": [{ "required": ["creatorId"] }, { "required": ["expiresAt"] }] }
     }

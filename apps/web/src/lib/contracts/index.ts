@@ -5,6 +5,7 @@ export type {
   Cloud,
   CloudWithPreviews,
   CreateMessageRequest,
+  CreateCloudRequest,
   Message,
   MessagesResponse,
   MultiPolygon,
@@ -29,7 +30,12 @@ export interface VoteState {
 /** `GET /clouds/:id` result. Expired detail reveals lifecycle metadata only. */
 export type CloudDetail =
   | { cloud: Cloud; lifecycle: unknown[]; successorIds: string[] }
-  | { id: string; status: "expired"; lifecycle: unknown[]; successorIds: string[] };
+  | {
+      id: string;
+      status: "expired";
+      lifecycle: unknown[];
+      successorIds: string[];
+    };
 
 /** UI post types mapped onto contract v1 message kinds (decision 0002). */
 export const POST_KIND = { text: "text", link: "song" } as const;
@@ -46,4 +52,9 @@ export const LINK_HOSTS = [
   "bandcamp.com",
 ] as const;
 
-export const LIMITS = { textChars: 2000, linkChars: 2048, defaultRadiusM: 25000, maxRadiusM: 50000 } as const;
+export const LIMITS = {
+  textChars: 2000,
+  linkChars: 2048,
+  defaultRadiusM: 25000,
+  maxRadiusM: 50000,
+} as const;

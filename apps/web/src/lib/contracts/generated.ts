@@ -177,6 +177,7 @@ export interface Message {
   version: number;
   cloudId: Id;
   authorId: Id;
+  author?: User;
   kind: "text" | "audio" | "song" | "drawing" | "png";
   anchor: Anchor;
   createdAt: Timestamp;
@@ -313,4 +314,5 @@ export interface CreateMessageRequest {
 export interface CreateCloudRequest {
   outline: Polygon;
   assumedAltitudeM: 2000;
+  datasetId?: Id;
 }
