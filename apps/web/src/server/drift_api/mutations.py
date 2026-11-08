@@ -28,7 +28,7 @@ from .validation import (
 )
 
 
-def create_message(ctx, cloud_id, value, user):
+def create_message(ctx, cloud_id, value, user, time_zone=None):
     message_input(value)
     cloud = active_cloud(ctx, cloud_id, value["expectedCloudVersion"])
     contains(ctx, cloud_id, value["anchor"])
@@ -84,6 +84,9 @@ def create_message(ctx, cloud_id, value, user):
     )
     if asset:
         collection(ctx, "assets").update_one({"_id": asset["id"]}, {"$set": {"attached_message_id": id}})
+    from .streaks import record_post
+
+    record_post(ctx, user, time_zone)
     return {"data": {**message, "author": public_author(ctx, user["id"])}}
 
 
