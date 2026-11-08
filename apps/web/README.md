@@ -45,3 +45,9 @@ The composer retains its request/key when a response is lost, including the orig
 
 - Indoor/outdoor scene model: Places365 ResNet18 (MIT CSAIL, CC BY), int8, run on the device with onnxruntime-web. Camera frames never leave the phone. Credits and build steps: `public/models/CREDITS.md`, `scripts/build_scene_model.py`. `npm run dev`/`build` copy the onnxruntime WASM into `public/ort/` (gitignored).
 - Virtual cloud photos (CC0 / public domain): `public/clouds/CREDITS.md`, built with `scripts/make_cloud_sprites.py`.
+
+## Anonymous posting and daily streaks
+
+People can publish text/link posts and created clouds without registering; public labels say **Anonymous**. A server-issued HttpOnly cookie keeps ownership and the streak in the same browser for up to 180 days. Clearing cookies or changing domains loses that guest identity. Signing in uses a separate Clerk identity and does not attach old anonymous posts to the profile. Voting and image uploads require sign-in.
+
+The header shows consecutive **posting** days, refreshed after a successful post and at the next local midnight. The browser sends its IANA time zone in `X-Drift-Time-Zone`; the server pins the initial zone, validates receipt time and credits each new message transactionally. Retries do not add credit. The tooltip shows the counting zone and best streak. The indoor/outdoor model affects rendering only; streaks do not claim verified outdoor activity. See `docs/decisions/0005-anonymous-posting-and-local-streaks.md` for API, cookie and travel policies.
