@@ -8,6 +8,8 @@ import type {
   SkyData,
   VoteState,
 } from "@/lib/contracts";
+import type { PostingStreak } from "@/lib/contracts/generated";
+import { browserTimeZone } from "@/lib/auth/useAnonymousSession";
 
 /** Error envelope `{error:{code,message,requestId}}`, or a network failure (status 0). */
 export class DriftApiError extends Error {
@@ -37,18 +39,22 @@ export class DriftApi {
   constructor(
     private readonly getToken: TokenSource = async () => null,
     private readonly base = "/api/v1",
+    private readonly ensureAnonymous?: () => Promise<string>,
   ) {}
 
   private async request<T>(
     path: string,
-    init: RequestInit & { auth?: boolean } = {},
+    init: RequestInit & { auth?: boolean; anonymous?: boolean } = {},
   ): Promise<Page<T>> {
     const headers = new Headers(init.headers);
     headers.set("accept", "application/json");
+    headers.set("X-Drift-Time-Zone", browserTimeZone());
     if (init.body) headers.set("content-type", "application/json");
     const token = await this.getToken();
-    if (init.auth && !token)
-      throw new DriftApiError(401, "UNAUTHENTICATED", "Sign in to continue");
+    if (init.auth && !token) {
+      if (init.anonymous && this.ensureAnonymous) await this.ensureAnonymous();
+      else throw new DriftApiError(401, "UNAUTHENTICATED", "Sign in to continue");
+    }
     if (token) headers.set("authorization", `Bearer ${token}`);
     let response: Response;
     try {
@@ -56,6 +62,7 @@ export class DriftApi {
         ...init,
         headers,
         cache: "no-store",
+        credentials: "same-origin",
       });
     } catch {
       throw new DriftApiError(
@@ -153,6 +160,7 @@ export class DriftApi {
         method: "POST",
         body: JSON.stringify(body),
         auth: true,
+        anonymous: true,
         headers: { "Idempotency-Key": key },
       },
     );
@@ -163,6 +171,7 @@ export class DriftApi {
       method: "POST",
       body: JSON.stringify(body),
       auth: true,
+      anonymous: true,
       headers: { "Idempotency-Key": key },
     });
   }
@@ -170,7 +179,7 @@ export class DriftApi {
   deleteCloud(id: string) {
     return this.request<{ id: string; expired: boolean }>(
       `/clouds/${encodeURIComponent(id)}`,
-      { method: "DELETE", auth: true },
+      { method: "DELETE", auth: true, anonymous: true },
     );
   }
 
@@ -197,8 +206,13 @@ export class DriftApi {
       {
         method: "DELETE",
         auth: true,
+        anonymous: true,
       },
     );
+  }
+
+  streak(signal?: AbortSignal) {
+    return this.request<PostingStreak>("/me/streak", { signal });
   }
 }
 

@@ -19,6 +19,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAnonymousSession } from "./useAnonymousSession";
 
 export interface DriftAuth {
   mode: "clerk" | "dev" | "none";
@@ -27,6 +28,7 @@ export interface DriftAuth {
   userId: string | null;
   label: string | null;
   getToken: () => Promise<string | null>;
+  ensureAnonymous: () => Promise<string>;
   signIn: () => void;
   signOut: () => void;
 }
@@ -61,24 +63,27 @@ function ClerkBridge({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const clerk = useClerk();
+  const guest = useAnonymousSession(Boolean(isLoaded && !isSignedIn));
   const value = useMemo<DriftAuth>(
     () => ({
       mode: "clerk",
-      ready: isLoaded,
+      ready: Boolean(isLoaded && (isSignedIn || guest.ready)),
       signedIn: Boolean(isSignedIn),
-      userId: user?.id ?? null,
-      label: user ? (user.username ?? user.firstName ?? "Signed in") : null,
+      userId: isSignedIn ? user?.id ?? null : guest.session?.id ?? null,
+      label: user ? (user.username ?? user.firstName ?? "Signed in") : guest.session?.displayName ?? null,
+      ensureAnonymous: guest.ensureAnonymous,
       getToken: () => getToken(),
       signIn: () => clerk.openSignIn({}),
       signOut: () => void clerk.signOut(),
     }),
-    [isLoaded, isSignedIn, getToken, user, clerk],
+    [isLoaded, isSignedIn, getToken, user, clerk, guest.ready, guest.session, guest.ensureAnonymous],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 function DevBridge({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
+  const guest = useAnonymousSession(!signedIn);
   const getToken = useCallback(
     async () => (signedIn ? "dev-mock-only" : null),
     [signedIn],
@@ -86,32 +91,35 @@ function DevBridge({ children }: { children: ReactNode }) {
   const value = useMemo<DriftAuth>(
     () => ({
       mode: "dev",
-      ready: true,
+      ready: signedIn || guest.ready,
       signedIn,
-      userId: signedIn ? "user_mock" : null,
-      label: signedIn ? "Dev user (mock API only)" : null,
+      userId: signedIn ? "user_mock" : guest.session?.id ?? null,
+      label: signedIn ? "Dev user (mock API only)" : guest.session?.displayName ?? null,
+      ensureAnonymous: guest.ensureAnonymous,
       getToken,
       signIn: () => setSignedIn(true),
       signOut: () => setSignedIn(false),
     }),
-    [signedIn, getToken],
+    [signedIn, getToken, guest.ready, guest.session, guest.ensureAnonymous],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 function NoAuth({ children }: { children: ReactNode }) {
+  const guest = useAnonymousSession(true);
   const value = useMemo<DriftAuth>(
     () => ({
       mode: "none",
-      ready: true,
+      ready: guest.ready,
       signedIn: false,
-      userId: null,
-      label: null,
+      userId: guest.session?.id ?? null,
+      label: guest.session?.displayName ?? null,
+      ensureAnonymous: guest.ensureAnonymous,
       getToken: async () => null,
       signIn: () => undefined,
       signOut: () => undefined,
     }),
-    [],
+    [guest.ready, guest.session, guest.ensureAnonymous],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
