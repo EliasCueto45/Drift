@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs test/database.integration.mjs",
+    "test:db": "node --test test/database.integration.mjs",
     "db:migrate": "node ../../../../db/migrate.mjs",
     "db:seed": "node ../../../../db/seed.mjs",
     "cleanup": "node cleanup-cli.mjs",
