@@ -45,10 +45,10 @@ class Engine:
         geometry = transform(self.grid.transformer(True).transform, track.geometry)
         return {"id": track.id, "version": track.version, "kind": track.kind, "status": track.status,
                 "geometry": mapping(geometry), "observedAt": iso(track.observed_at),
-                "updatedAt": iso(track.position_at), "confidence": track.confidence,
-                "wind": {"uMps": wind.u, "vMps": wind.v, "altitudeM": track.altitude_m,
+                "updatedAt": iso(track.position_at), "confidence": float(track.confidence),
+                "wind": {"uMps": float(wind.u), "vMps": float(wind.v), "altitudeM": float(track.altitude_m),
                          "source": wind.source, "validAt": iso(wind.valid_at or at),
-                         "confidence": wind.confidence}, "parentIds": track.parents,
+                         "confidence": float(wind.confidence)}, "parentIds": track.parents,
                 "creatorId": track.creator_id, "expiresAt": iso(track.expires_at) if track.expires_at else None,
                 "datasetId": self.dataset_id, "trackingRunId": self.run_id}
 

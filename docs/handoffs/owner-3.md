@@ -1,5 +1,15 @@
 # Owner 3 — Tracking
 
+## Integration with unmerged Owner 2 backend (`69f1f00`)
+
+Fetched and fast-forwarded `owner-3/tracking` to the backend branch (it already descended from our latest tracking work). Main and owner-2/backend were not modified. Added opt-in actual-backend/PostGIS worker tests and a manual current-NOAA-to-backend smoke script, all in Owner 3 paths. Fixed native JSON confidence export and NumPy checkpoint serialization after actual current imagery exposed float32 values; added a regression test.
+
+Verified with DRIFT_TEST_BACKEND=1: 39 worker/shared/backend tests pass with warnings as errors. Owner 2's explicit backend suite: 19 pass. Workspace contract generation/fixture checks, lint, typecheck, tests and build pass. Root recursive checks still skip the backend's independent npm package; it was installed and tested explicitly.
+
+Current-sky integration smoke: observed 2026-11-08 01:41:18.3 UTC (Nov 7, 8:41 p.m. Eastern), processed/published at 01:45:28 UTC. Two actual NOAA batches committed through real backend HTTP handlers and embedded PostGIS, sequence 2, one cloud, sky freshness live. This validates current ingestion and API persistence, not a deployed browser/Clerk/S3 stack or ordinary PostgreSQL concurrency.
+
+Owner 4 exact requests: consolidate backend package/lock into workspace, enable the opt-in worker/backend integration job after installing backend dependencies, and provision ordinary PostgreSQL plus a web host. Owner 1 exact request: connect sky reads to provisioned troy-live and verify observation age/current geometry in-browser. Owner 2's held/geometric-time/state contracts passed these integration tests; no backend source changes were needed. Follow remaining deployment/fixture/media requests in owner-2.md.
+
 ## Current-real-sky MVP requirement
 
 The final hackathon product must use current sky observations. Added `python -m cloud_worker.live` for continuous automatic NOAA catalog discovery and polling, plus `--once` for diagnostics. Default Troy live dataset/state are distinct from replay. Selects recent masks, height/IR where co-timed, and altitude-aware DMW; rejects stale/future masks and never falls back to fixtures. Acquisition failures retain state/content; ingest errors stop with the durable journal intact. New acquisition tests plus existing worker/shared integration suite: 37 passed with warnings as errors. Missing five-minute acquisitions reset clear-sky evidence before further expiry decisions.

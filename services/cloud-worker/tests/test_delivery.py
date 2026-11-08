@@ -17,6 +17,19 @@ def test_checkpoint_roundtrip_preserves_artwork_and_evidence():
     assert restored.previous.observed_at == T+timedelta(minutes=5)
 
 
+def test_real_image_numpy_confidence_is_serializable(tmp_path):
+    import numpy as np
+    e = seeded()
+    e.tracks['a'].confidence = np.float32(.6)
+    batch=e.step(frame(5,False,False),WindField())
+    json_sink=JsonlSink(tmp_path/'numpy.jsonl')
+    json_sink.send(batch)
+    journal=Journal(tmp_path/'numpy-journal.json',seeded())
+    journal.stage(batch,e)
+    journal.acknowledge()
+    assert journal.engine().tracks['a'].confidence == pytest.approx(.48)
+
+
 def test_lost_ack_retries_identical_batch_without_advancing(tmp_path):
     journal = Journal(tmp_path/"journal.json", seeded())
     class Sink:

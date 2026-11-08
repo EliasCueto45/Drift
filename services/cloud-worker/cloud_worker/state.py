@@ -11,6 +11,12 @@ from .engine import Engine
 from .models import ClearEvidence, Frame, Grid, Parcel, Track, iso, timestamp
 
 
+def scientific_scalar(value):
+    if isinstance(value, np.generic):
+        return value.item()
+    raise TypeError(f"Unsupported checkpoint type: {type(value).__name__}")
+
+
 def frame_json(frame):
     if frame is None:
         return None
@@ -89,7 +95,7 @@ class Journal:
     def _write(self):
         temporary = self.path.with_suffix(".tmp")
         with temporary.open("w", encoding="utf-8") as stream:
-            json.dump(self.value, stream, allow_nan=False, separators=(",", ":"))
+            json.dump(self.value, stream, allow_nan=False, separators=(",", ":"), default=scientific_scalar)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, self.path)
