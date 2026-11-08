@@ -78,6 +78,6 @@ def cleanup(ctx, make_client=storage_client, batch_size=100):
         if not asset.get("attached_message_id"):
             fields["payload.state"] = "deleted"
         collection(ctx, "assets").update_one({"_id": asset["id"]}, {"$set": fields})
-    for name in ("query_snapshots", "snapshot_items", "rate_windows"):
+    for name in ("query_snapshots", "snapshot_items", "rate_windows", "create_receipts"):
         collection(ctx, name).delete_many({"expires_at": {"$lt": ctx.now}})
     return {"completed": completed, "failed": failed}
