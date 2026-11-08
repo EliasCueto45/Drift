@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent, type MutableRefObject, type PointerEvent } from "react";
+import { ringsRect, type Rect } from "./focusGeometry";
 import type { Anchor, CloudWithPreviews, Freshness, Message } from "@/lib/contracts";
 import { usePosts } from "@/features/composer/posts";
 import { DEG } from "./geo";
@@ -34,6 +35,14 @@ export interface RegistrationReport {
   ms: number;
 }
 
+/** Freeze-frame access for the cloud focus zoom (CloudFocus). */
+export interface SkyCapture {
+  /** Camera frame (cover-cropped as shown) with the sky canvas on top; no DOM controls. */
+  snapshot: () => HTMLCanvasElement | null;
+  /** The cloud's screen box right now, or null when it is off screen. */
+  cloudRect: (id: string) => Rect | null;
+}
+
 export interface Draft {
   cloudId: string;
   anchor: Anchor;
@@ -51,7 +60,8 @@ interface Props {
   draft: Draft | null;
   onTap: (id: string | null) => void;
   onOpen: (id: string) => void;
-  onPlace: (cloudId: string, anchor: Anchor) => void;
+  /** `at`: the tapped screen point, for zooming into the chosen spot. */
+  onPlace: (cloudId: string, anchor: Anchor, at?: { x: number; y: number }) => void;
   onPlaceMiss: () => void;
   onPan?: (dAzDeg: number, dElDeg: number) => void;
   onSummary: (s: SceneSummary) => void;
@@ -69,6 +79,7 @@ interface Props {
    * the tracked footprints, tinted for day or night, and stop camera cloud matching.
    */
   virtualClouds?: "off" | "day" | "night";
+  captureRef?: MutableRefObject<SkyCapture | null>;
 }
 
 const SETTLE_MS = 600;
@@ -89,6 +100,44 @@ export function SkyStage(props: Props) {
   const { created, vote } = usePosts();
   const postsRef = useLatest({ created, vote });
   const sceneRef = useRef<{ clouds: SceneCloud[]; projection: SkyProjection } | null>(null);
+
+  // Freeze-frame for the focus zoom: what the person sees, minus every control.
+  const { captureRef } = props;
+  useEffect(() => {
+    if (!captureRef) return;
+    captureRef.current = {
+      snapshot() {
+        const canvas = canvasRef.current;
+        if (!canvas || !canvas.width) return null;
+        const out = document.createElement("canvas");
+        out.width = canvas.width;
+        out.height = canvas.height;
+        const ctx = out.getContext("2d");
+        if (!ctx) return null;
+        const video = videoRef.current;
+        if (video && video.videoWidth && propsRef.current.mode === "camera") {
+          // Same crop as the video's object-fit: cover.
+          const cover = Math.max(out.width / video.videoWidth, out.height / video.videoHeight);
+          const sw = out.width / cover;
+          const sh = out.height / cover;
+          ctx.drawImage(video, (video.videoWidth - sw) / 2, (video.videoHeight - sh) / 2, sw, sh, 0, 0, out.width, out.height);
+        }
+        ctx.drawImage(canvas, 0, 0);
+        return out;
+      },
+      cloudRect(id) {
+        const scene = sceneRef.current;
+        const canvas = canvasRef.current;
+        const cloud = scene?.clouds.find((c) => c.id === id);
+        if (!cloud || !canvas) return null;
+        const box = canvas.getBoundingClientRect();
+        return ringsRect(cloud.rings, { width: box.width, height: box.height });
+      },
+    };
+    return () => {
+      captureRef.current = null;
+    };
+  }, [captureRef, propsRef]);
 
   // Canvas text needs the resolved next/font family; re-read once the face has loaded.
   useEffect(() => {
@@ -311,7 +360,7 @@ export function SkyStage(props: Props) {
       const hit = pickCloud(scene.clouds, x, y, null, TAP_TOLERANCE_PX);
       const target = hit ? scene.clouds.find((c) => c.id === hit) : undefined;
       const anchor = target ? anchorOnCloud(target, scene.projection, x, y) : null;
-      if (target && anchor) props.onPlace(target.id, anchor);
+      if (target && anchor) props.onPlace(target.id, anchor, { x, y });
       else props.onPlaceMiss();
       return;
     }

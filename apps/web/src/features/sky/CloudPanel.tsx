@@ -23,9 +23,12 @@ export function CloudPanel({
   viewer,
   onClose,
   onOpen,
+  onCloud = false,
 }: {
   item: CloudWithPreviews;
   viewer: Anchor;
+  /** Drawn over the zoomed-in cloud instead of on a white sheet. */
+  onCloud?: boolean;
   onClose: () => void;
   onOpen: () => void;
 }) {
@@ -51,7 +54,7 @@ export function CloudPanel({
   const mineIds = new Set(mine.map((m) => m.id));
 
   return (
-    <section className={styles.panel} aria-labelledby="cloud-panel-title">
+    <section className={styles.panel} data-surface={onCloud ? "cloud" : undefined} aria-labelledby="cloud-panel-title">
       <header className={styles.panelHead}>
         <div>
           <h2 id="cloud-panel-title" className={styles.panelTitle}>

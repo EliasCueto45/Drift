@@ -305,3 +305,25 @@
     opacity: 0;
   }
 }
+
+/* On the zoomed-in cloud: same form, no white sheet; it surfaces out of the vapor. */
+.composer[data-surface="cloud"] {
+  background: transparent;
+  box-shadow: none;
+  max-height: 62dvh;
+  animation: surface 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes surface {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer[data-surface="cloud"] {
+    animation: none;
+  }
+}

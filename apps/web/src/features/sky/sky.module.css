@@ -174,7 +174,8 @@
 .hint {
   flex: 0 1 220px;
   min-width: 0;
-  align-self: center;
+  /* Level with the map button: both sit on the dock's bottom edge (a one-line hint is 44px, like the button). */
+  align-self: flex-end;
   /* Own compositing layer so text changes repaint cleanly behind the blur. */
   transform: translateZ(0);
   text-wrap: balance;
@@ -205,20 +206,6 @@
   padding: 0 12px;
   font-weight: 700;
   font-size: var(--t-s);
-}
-
-.nudge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.nudge button {
-  width: 36px;
-  min-height: 36px;
-  padding: 0;
-  display: inline-grid;
-  place-items: center;
 }
 
 .toast {
@@ -474,4 +461,107 @@
     font-size: 1.125rem;
     text-align: center;
   }
+}
+
+/* ---------- Cloud focus: the frozen sky zooms into the chosen cloud ---------- */
+.focus {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0d1a2e;
+}
+
+.focusFrame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+  /* Zoom in: a long, confident deceleration that lands on the cloud. */
+  transition:
+    transform var(--focus-in) cubic-bezier(0.16, 1, 0.3, 1),
+    filter var(--focus-in) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* At 2-4x the frozen frame softens anyway; a light blur makes it read as vapor, not pixels. */
+.focus[data-zoomed] .focusFrame {
+  filter: blur(1.5px) saturate(1.06);
+}
+
+/* Zoom out: quicker, so leaving never feels like waiting. */
+.focus[data-closing] .focusFrame,
+.focus[data-closing] .focusVeil {
+  transition-duration: var(--focus-out);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Brightens the lower cloud where the words sit, so ink stays legible on gray vapor. */
+.focusVeil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 38%, rgba(246, 249, 252, 0.78) 100%);
+  opacity: 0;
+  transition: opacity var(--focus-in) ease-out;
+  pointer-events: none;
+}
+
+.focus[data-zoomed] .focusVeil {
+  opacity: 1;
+}
+
+/* Panels on the cloud: same content, no white sheet; they surface out of the vapor. */
+.panel[data-surface="cloud"],
+.sheet[data-surface="cloud"] {
+  background: transparent;
+  box-shadow: none;
+  animation: surface 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.panel[data-surface="cloud"] {
+  max-height: min(62dvh, 620px);
+}
+
+.sheetBackdrop[data-surface="cloud"] {
+  background: transparent;
+  animation: none;
+}
+
+/* The tall feed reaches up into thinner, grayer vapor: give it a clear-glass layer. */
+.sheet[data-surface="cloud"] {
+  background: rgba(255, 255, 255, 0.42);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-bottom: 0;
+}
+
+@keyframes surface {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No zoom flight: the focused cloud fades in already framed. */
+  .focusFrame {
+    transition: none;
+  }
+  .focus {
+    animation: fade 200ms ease-out;
+  }
+  .focus[data-closing] {
+    opacity: 0;
+    transition: opacity 160ms ease-in;
+  }
+  .panel[data-surface="cloud"],
+  .sheet[data-surface="cloud"] {
+    animation: fade 200ms ease-out;
+  }
+}
+
+.topbar[hidden] {
+  display: none;
 }
