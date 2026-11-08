@@ -5,7 +5,8 @@ from pathlib import Path
 import sys
 from datetime import datetime, timezone
 
-from .delivery import ApiClient, deliver, flush
+from .delivery import ApiClient, TransportUnavailable, deliver, flush
+from urllib.error import HTTPError, URLError
 from .engine import Engine
 from .inputs import observation_inputs, synthetic_inputs
 from .models import Grid
@@ -43,7 +44,7 @@ class JsonlSink:
                 os.fsync(stream.fileno())
 
 
-def main(argv=None):
+def main(argv=None, *, propagate_transport_errors=False):
     parser = argparse.ArgumentParser(description="Drift wind-assisted cloud worker")
     parser.add_argument("--mode", choices=("replay", "live"), default="replay")
     parser.add_argument("--dataset", default=os.getenv("DRIFT_DATASET_ID", "troy-demo"))
@@ -78,8 +79,9 @@ def main(argv=None):
         try:
             journal = Journal(args.state_dir/"journal.json", initial)
             engine = journal.engine()
-            if (engine.dataset_id, engine.run_id, engine.grid) != (args.dataset, args.run_id, grid):
+            if (engine.dataset_id, engine.run_id) != (args.dataset, args.run_id):
                 raise ValueError("state directory belongs to another dataset/run/grid")
+            engine.expand_grid(grid)
             if args.publish:
                 schema = json.loads((args.batch_schema or DEFAULT_SCHEMA).read_text(encoding="utf-8"))
                 sink = ApiClient(os.environ["DRIFT_API_BASE_URL"], os.environ["TRACKING_INGEST_SECRET"], schema)
@@ -108,6 +110,16 @@ def main(argv=None):
             lock.unlink(missing_ok=True)
     except (ValidationError, SchemaError):
         print("worker stopped: batch/schema validation failed; checkpoint not advanced", file=sys.stderr)
+        return 1
+    except HTTPError as error:
+        if propagate_transport_errors and error.code in (408, 429, 500, 502, 503, 504):
+            raise
+        print(f"worker stopped: remote HTTP {error.code}", file=sys.stderr)
+        return 1
+    except (URLError, TimeoutError, ConnectionError, TransportUnavailable) as error:
+        if propagate_transport_errors:
+            raise
+        print(f"worker stopped: {error}", file=sys.stderr)
         return 1
     except (ValueError, KeyError, OSError, RuntimeError) as error:
         print(f"worker stopped: {error}", file=sys.stderr)

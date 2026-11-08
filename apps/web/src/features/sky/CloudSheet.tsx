@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "@/lib/api/ApiProvider";
 import { DriftApiError } from "@/lib/api/client";
 import type { Anchor, CloudWithPreviews, Message } from "@/lib/contracts";
-import { LIMITS } from "@/lib/contracts";
+import { DISCOVERY_RADIUS_M } from "./discovery";
 import { PostItem } from "@/features/composer/PostItem";
 import { usePosts } from "@/features/composer/posts";
 import { heightText } from "./describe";
@@ -28,7 +28,7 @@ export function CloudSheet({ item, viewer, onClose }: { item: CloudWithPreviews;
     async (which: Scope, cursor: string | null, initial = false) => {
       if (!initial) setPages((p) => ({ ...p, [which]: { ...p[which], loading: true, error: null } }));
       try {
-        const res = await api.messages(cloudId, { scope: which, at: viewer, radiusM: LIMITS.defaultRadiusM, cursor, limit: 20 });
+        const res = await api.messages(cloudId, { scope: which, at: viewer, radiusM: DISCOVERY_RADIUS_M, cursor, limit: 20 });
         setPages((p) => {
           const seen = new Set(p[which].items.map((m) => m.id));
           return {
@@ -116,7 +116,7 @@ export function CloudSheet({ item, viewer, onClose }: { item: CloudWithPreviews;
           ))}
         </div>
         <div id="cloud-sheet-list" role="tabpanel" aria-labelledby={`tab-${scope}`} className={styles.sheetBody}>
-          {scope === "nearby" && <p className={styles.panelMeta}>Within 25 km of you, most upvoted first.</p>}
+          {scope === "nearby" && <p className={styles.panelMeta}>Within {DISCOVERY_RADIUS_M / 1000} km of you, most upvoted first.</p>}
           {list.length > 0 && (
             <ul className={styles.panelList}>
               {list.map((m) => (

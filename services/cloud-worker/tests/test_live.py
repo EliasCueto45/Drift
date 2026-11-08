@@ -52,3 +52,72 @@ def test_acquisition_gap_resets_clear_evidence():
         assert all(u["action"] != "expire" for u in batch["anchorUpdates"])
     batch = engine.step(frame(30,False),WindField())
     assert all(u["action"] == "expire" for u in batch["anchorUpdates"])
+
+
+def test_supervisor_retries_download_dns_failure_without_discarding_journal(tmp_path, monkeypatch):
+    import json
+    from urllib.error import URLError
+    from cloud_worker import live
+    from cloud_worker.engine import Engine
+    from cloud_worker.models import Grid
+    from cloud_worker.state import encode
+
+    journal = tmp_path / "journal.json"
+    checkpoint = encode(Engine(Grid(**live.GRID), "troy-live", "regional-v1"))
+    original = json.dumps({"checkpoint": checkpoint, "pending": {"batch": {"batchId": "keep"}, "nextState": checkpoint}})
+    journal.write_text(original)
+    monkeypatch.setattr(live, "discover", lambda *_: discover(FakeCatalog(), NOW))
+    calls, statuses = [], []
+
+    def run(command, *, propagate_transport_errors):
+        assert propagate_transport_errors
+        assert journal.read_text() == original
+        calls.append(command)
+        if len(calls) == 1:
+            raise URLError("getaddrinfo failed")
+        return 0
+
+    def sleep(_):
+        statuses.append(json.loads((tmp_path / "acquisition-status.json").read_text())["status"])
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(live, "worker_main", run)
+    monkeypatch.setattr(live.time, "sleep", sleep)
+    assert live.main(["--state-dir", str(tmp_path)]) == 0
+    assert statuses == ["unavailable", "live"]
+    assert not (tmp_path / "acquisition.lock").exists()
+
+
+def test_supervisor_still_stops_on_nonretryable_worker_failure(tmp_path, monkeypatch):
+    from cloud_worker import live
+
+    monkeypatch.setattr(live, "discover", lambda *_: discover(FakeCatalog(), NOW))
+    monkeypatch.setattr(live, "worker_main", lambda *a, **kw: 1)
+    monkeypatch.setattr(live.time, "sleep", lambda _: pytest.fail("fatal error must not retry"))
+    assert live.main(["--state-dir", str(tmp_path)]) == 1
+
+
+def test_live_coverage_grows_around_content_and_preserves_pending_checkpoint(tmp_path):
+    import json
+    from cloud_worker.live import coverage_grid
+    from cloud_worker.engine import Engine
+    from cloud_worker.models import Grid, Parcel
+    from cloud_worker.state import encode
+
+    g = Grid("EPSG:32618", 580000, 4710000, 1000, 64, 64)
+    e = Engine(g, "troy-live", "regional-v1")
+    e.parcels["post"] = Parcel("post", "cloud", 628429, 4701161)
+    next_state = encode(e)
+    # Pending transport retries may already have expanded beyond the committed grid.
+    next_state["grid"] = {"crs":g.crs,"x0":516000,"y0":4646000,"cell_m":1000,"width":192,"height":192}
+    journal = {"checkpoint": encode(e), "pending": {"nextState": next_state}}
+    path = tmp_path / "journal.json"
+    original = json.dumps(journal)
+    path.write_text(original)
+    grown = Grid(**coverage_grid(tmp_path))
+    assert grown.cell(628429, 4701161-32000) is not None
+    assert grown.x0 <= 516000 and grown.y0 <= 4646000
+    assert path.read_text() == original
+    with pytest.raises(ValueError, match="coverage budget"):
+        coverage_grid(tmp_path, max_axis_cells=128)

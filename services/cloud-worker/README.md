@@ -42,6 +42,10 @@ The CLI prints mode, synthetic flag, dataset, batch count and sequence. It never
 
 The final product targets current observations. Historical/synthetic replay is only a rehearsal and regression tool. Use the acquisition supervisor to discover fresh products automatically rather than maintain a manifest by hand:
 
+The continuous supervisor retries temporary DNS/network errors and retryable HTTP service failures on the next poll, preserving its durable checkpoint and pending batch. Acquisition status reports `unavailable` during these outages. Authentication, contract validation, and unresolved ingest-state errors still stop the worker for reconciliation. Use `--once` for a single attempt with a failure exit code.
+
+Observation coverage is separate from persistent cloud identity. Only occupied clouds receive temporal tracking by default, but their moving anchors still need current satellite pixels for association and dissipation checks. The Troy observation grid starts at 128x128 km and expands in aligned 32 km tiles to keep a 32 km buffer around journaled message anchors, up to 512 cells per axis. This prevents a fixed download boundary being mistaken for the physical edge of overcast. Expansion preserves coordinates, dataset/run, sequence, and pending batches; it never snaps posts or resets the live dataset. At expansion the old and new image grids differ, so motion uses the existing wind fallback until consecutive images share the expanded grid. The cap reports unavailable for operator intervention. This regional MVP grows one window; global/long-lived journeys require moving windows or regional handoffs rather than retaining the full travelled area.
+
 ```sh
 # One current-sky acquisition/processing check, no backend needed:
 uv run --project services/cloud-worker --locked python -m cloud_worker.live --once

@@ -4,6 +4,7 @@ from shapely.geometry import MultiPolygon, box
 from cloud_worker.engine import Engine
 from cloud_worker.models import Grid, Frame, Track, Parcel, timestamp
 from cloud_worker.wind import WindField
+import pytest
 
 T = timestamp("2026-11-07T12:00:00Z")
 G = Grid("EPSG:32618", 600000, 4700000, 1000, 16, 16)
@@ -60,3 +61,42 @@ def test_created_cloud_expires_independently_and_never_merges():
     assert e.parcels["left"].cloud_id == "a"
     batch = e.step(frame(24*60), WindField())
     assert all(u["action"] == "expire" for u in batch["anchorUpdates"])
+
+
+def test_expanded_satellite_coverage_recovers_held_anchor_without_snapping():
+    from cloud_worker.wind import Wind
+
+    class SouthWind:
+        def at(self, *args):
+            return Wind(0, -10, 1, 2000, "synthetic-wind", T)
+
+    e = seeded()
+    e.previous = frame()
+    first = e.step(frame(5), SouthWind())
+    assert next(u for u in first["anchorUpdates"] if u["messageId"] == "left")["action"] == "hold"
+    outside = (e.parcels["left"].x, e.parcels["left"].y)
+    assert G.cell(*outside) is None
+    bigger = Grid(G.crs, G.x0-8000, G.y0-8000, G.cell_m, 32, 32)
+    observed = Frame(T+timedelta(minutes=10), bigger, np.ones(bigger.shape, bool),
+                     np.ones(bigger.shape, bool), np.full(bigger.shape, 2000), "synthetic-overcast")
+    batch = e.step(observed, SouthWind())
+    parcel = e.parcels["left"]
+    assert next(u for u in batch["anchorUpdates"] if u["messageId"] == "left")["action"] == "move"
+    assert parcel.cloud_id == "a" and "left" not in e.pending
+    assert parcel.y < outside[1]  # It kept drifting; it was not snapped back inside the old crop.
+    assert G.cell(parcel.x, parcel.y) is None
+    assert bigger.cell(parcel.x, parcel.y) is not None
+    assert e.sequence == 2 and e.tracks["a"].version == 3
+
+
+@pytest.mark.parametrize("grid", [
+    Grid(G.crs, G.x0+1000, G.y0, G.cell_m, 32, 32),
+    Grid(G.crs, G.x0-500, G.y0, G.cell_m, 32, 32),
+    Grid(G.crs, G.x0, G.y0, G.cell_m/2, 32, 32),
+    Grid("EPSG:32619", G.x0, G.y0, G.cell_m, 32, 32),
+])
+def test_coverage_growth_rejects_shift_reprojection_or_resolution_change(grid):
+    e = seeded()
+    with pytest.raises(ValueError, match="only expand"):
+        e.expand_grid(grid)
+    assert e.grid == G

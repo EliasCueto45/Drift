@@ -3,6 +3,7 @@ from dataclasses import replace
 from datetime import timedelta
 
 import numpy as np
+import math
 from shapely import intersects_xy
 from shapely.geometry import Point, box, mapping
 from shapely.ops import transform
@@ -25,6 +26,20 @@ class Engine:
         self.previous: Frame | None = None
         self.sequence = 0
         self.content_only = False
+
+    def expand_grid(self, grid):
+        """Grow coverage without changing the metric coordinate system or losing state."""
+        old = self.grid
+        if grid == old:
+            return
+        aligned = all(math.isclose(value, round(value), abs_tol=1e-8) for value in
+                      ((old.x0-grid.x0)/old.cell_m, (old.y0-grid.y0)/old.cell_m))
+        if (grid.crs != old.crs or grid.cell_m != old.cell_m or not aligned
+                or grid.x0 > old.x0 or grid.y0 > old.y0
+                or grid.x0+grid.width*grid.cell_m < old.x0+old.width*old.cell_m
+                or grid.y0+grid.height*grid.cell_m < old.y0+old.height*old.cell_m):
+            raise ValueError("tracking coverage may only expand on the same aligned metric grid")
+        self.grid = grid
 
     def _event(self, kind, sources, targets, at):
         return {"eventId": stable_id(self.dataset_id, self.run_id, iso(at), kind, *sources, *targets),
@@ -61,10 +76,9 @@ class Engine:
                 "datasetId": self.dataset_id, "trackingRunId": self.run_id}
 
     def step(self, frame, winds):
-        if frame.grid != self.grid:
-            raise ValueError("frame grid changed within a tracking run")
         if self.previous and frame.observed_at <= self.previous.observed_at:
             raise ValueError("observations must be strictly chronological")
+        self.expand_grid(frame.grid)
         if self.previous and (frame.observed_at-self.previous.observed_at).total_seconds() > 450:
             # Five-minute CONUS acquisitions: an acquisition outage is unknown,
             # even when no invalid frame was delivered to the engine.

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLatest } from "@/lib/useLatest";
 import { DriftApiError, type DriftApi } from "@/lib/api/client";
 import type { Anchor, CloudWithPreviews, SkyData } from "@/lib/contracts";
-import { LIMITS } from "@/lib/contracts";
+import { DISCOVERY_RADIUS_M } from "./discovery";
 
 export interface SkyState {
   clouds: CloudWithPreviews[];
@@ -35,7 +35,7 @@ export function useSky(api: DriftApi, at: Anchor | null, datasetId: string, inte
         const clouds: CloudWithPreviews[] = [];
         let first: SkyData | null = null;
         for (let page = 0; page < MAX_PAGES; page++) {
-          const res = await api.sky({ at: where, radiusM: LIMITS.defaultRadiusM, datasetId, cursor }, controller.signal);
+          const res = await api.sky({ at: where, radiusM: DISCOVERY_RADIUS_M, datasetId, cursor }, controller.signal);
           first ??= res.data;
           clouds.push(...res.data.clouds);
           cursor = res.nextCursor;

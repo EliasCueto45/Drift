@@ -7,6 +7,27 @@ from test_engine import seeded, frame, G, T
 from cloud_worker.wind import WindField
 
 
+def test_cli_only_propagates_retryable_transport_errors(tmp_path, monkeypatch):
+    from urllib.error import HTTPError, URLError
+    from cloud_worker import cli
+
+    def broken_inputs(_):
+        raise URLError("getaddrinfo failed")
+
+    monkeypatch.setattr(cli, "synthetic_inputs", broken_inputs)
+    args = ["--state-dir", str(tmp_path / "state"), "--output", str(tmp_path / "out.jsonl")]
+    with pytest.raises(URLError):
+        cli.main(args, propagate_transport_errors=True)
+    assert not (tmp_path / "state" / "worker.lock").exists()
+    assert cli.main(args) == 1
+
+    def denied_inputs(_):
+        raise HTTPError("https://example.invalid", 401, "Denied", {}, None)
+
+    monkeypatch.setattr(cli, "synthetic_inputs", denied_inputs)
+    assert cli.main(args, propagate_transport_errors=True) == 1
+
+
 def test_checkpoint_roundtrip_preserves_artwork_and_evidence():
     e = seeded()
     e.step(frame(5, False), WindField())

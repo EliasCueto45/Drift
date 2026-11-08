@@ -7,6 +7,7 @@ import { useDriftAuth } from "@/lib/auth/DriftAuth";
 import type { Anchor, CloudWithPreviews, CreateMessageRequest, Message } from "@/lib/contracts";
 import { LIMITS, LINK_HOSTS } from "@/lib/contracts";
 import { linkLabel } from "./posts";
+import { DISCOVERY_RADIUS_M, placementInRange } from "@/features/sky/discovery";
 import styles from "./composer.module.css";
 
 type Kind = "text" | "link";
@@ -42,6 +43,7 @@ export function validateText(raw: string): string | null {
 export function Composer({
   item,
   anchor,
+  viewer,
   onCancel,
   onPublished,
   onStale,
@@ -50,6 +52,7 @@ export function Composer({
 }: {
   item: CloudWithPreviews;
   anchor: Anchor;
+  viewer: Anchor;
   onCancel: () => void;
   onPublished: (m: Message) => void;
   onStale: (reason: string, final: boolean) => void;
@@ -83,6 +86,10 @@ export function Composer({
     setTouched(true);
     if (problem || busy) return;
     if (!auth.signedIn) return auth.signIn();
+    if (!placementInRange(viewer, anchor)) {
+      setError(`Choose a spot within ${DISCOVERY_RADIUS_M / 1000} km so you can find it again in your nearby sky.`);
+      return;
+    }
     setBusy(true);
     setError(null);
     const request: CreateMessageRequest =
