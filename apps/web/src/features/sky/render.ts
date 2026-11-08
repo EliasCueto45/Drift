@@ -34,7 +34,7 @@ export function setVaporFont(stack: string) {
   if (stack) FONT_STACK = `${stack}, system-ui, sans-serif`;
 }
 export function vaporFont(size: number) {
-  return `700 ${size}px ${FONT_STACK}`;
+  return `600 ${size}px ${FONT_STACK}`;
 }
 const SKY_CHARS = 64;
 
@@ -66,9 +66,10 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, max
 
 /** Size by distance (perspective) and by votes (popularity reads as larger letters). */
 export function postSize(distanceM: number, votes: number) {
-  const base = 30 * Math.sqrt(5000 / Math.max(800, distanceM));
-  const boost = 1 + 0.08 * Math.min(votes, 6);
-  return Math.max(15, Math.min(38, base * boost));
+  // Subtle: small lettering that sits in the cloud rather than headlining it.
+  const base = 19 * Math.sqrt(5000 / Math.max(800, distanceM));
+  const boost = 1 + 0.05 * Math.min(votes, 6);
+  return Math.max(12, Math.min(24, base * boost));
 }
 
 /**
@@ -145,12 +146,12 @@ function linkWord(url: string | null) {
   }
 }
 
-/** Post text colour: near-black ink, a few shades off pure black so it sits in the cloud. */
-export const POST_INK = "rgb(38, 41, 46)";
+/** Post text colour: a cool mid-gray, like shading inside the cloud rather than ink on top. */
+export const POST_INK = "rgb(92, 100, 112)";
 
 /**
- * Dark ink lettering on the cloud. A soft white halo keeps words legible where they spill
- * past the cloud onto blue sky or the night; less certain placements are drawn softer.
+ * Gray lettering embedded in the cloud: no halo, slightly translucent and softly blurred so
+ * it reads as part of the vapor at a distance. Less certain placements are drawn softer.
  */
 export function drawVaporText(ctx: CanvasRenderingContext2D, p: PlacedPost) {
   ctx.save();
@@ -163,16 +164,10 @@ export function drawVaporText(ctx: CanvasRenderingContext2D, p: PlacedPost) {
   const top = p.y - ((p.lines.length - 1) * lineH) / 2;
   const soft = (p.certainty === "measured" ? 1 : p.certainty === "estimated" ? 1.5 : 2.4) * (p.soften ?? 1);
   const each = (draw: (line: string, y: number) => void) => p.lines.forEach((line, i) => draw(line, top + i * lineH));
-  ctx.globalAlpha = p.alpha;
-  // 1. Halo: a soft white glow behind the letters.
-  ctx.shadowColor = "rgba(255, 255, 255, 0.85)";
-  ctx.shadowBlur = p.size * 0.45 * k;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-  ctx.lineWidth = p.size * 0.16;
-  each((line, y) => ctx.strokeText(line, p.x, y));
-  // 2. Ink face. Uncertainty blurs the edges a little rather than changing the colour.
-  ctx.shadowColor = "rgba(38, 41, 46, 0.55)";
-  ctx.shadowBlur = Math.max(0, soft - 1) * p.size * 0.08 * k;
+  ctx.globalAlpha = p.alpha * 0.82;
+  // Distance haze: a faint same-colour blur softens every edge; uncertainty adds more.
+  ctx.shadowColor = "rgba(92, 100, 112, 0.6)";
+  ctx.shadowBlur = (0.6 + Math.max(0, soft - 1)) * p.size * 0.08 * k;
   ctx.fillStyle = POST_INK;
   each((line, y) => ctx.fillText(line, p.x, y));
   ctx.restore();

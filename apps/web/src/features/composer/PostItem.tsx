@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUp, ExternalLink } from "lucide-react";
+import { ExternalLink, Wind } from "lucide-react";
 import type { Message } from "@/lib/contracts";
 import { linkLabel, timeAgo, usePosts } from "./posts";
 import styles from "./composer.module.css";
@@ -29,11 +29,11 @@ export function PostItem({ message, mine = false }: { message: Message; mine?: b
         type="button"
         className={styles.vote}
         aria-pressed={v.viewerHasUpvoted}
-        aria-label={`${v.viewerHasUpvoted ? "Remove upvote" : "Upvote"}, ${v.voteCount} ${v.voteCount === 1 ? "upvote" : "upvotes"}`}
+        aria-label={`${v.viewerHasUpvoted ? "Take back your puff" : "Give a puff"}, ${v.voteCount} ${v.voteCount === 1 ? "puff" : "puffs"}`}
         data-pending={v.pending || undefined}
         onClick={() => void toggleVote(message)}
       >
-        <ArrowUp size={18} strokeWidth={2.25} aria-hidden="true" />
+        <Wind size={18} strokeWidth={2.25} aria-hidden="true" />
         <span className="tabular">{v.voteCount}</span>
       </button>
     </li>
