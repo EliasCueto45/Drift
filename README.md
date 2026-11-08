@@ -33,7 +33,7 @@ apps/web/src/features/sky/         camera AR, sensor pose, projection, map fallb
 apps/web/src/features/composer/    posts, links, image uploads, voting UI
 services/cloud-worker/            satellite/wind adapters and tracker
 packages/contracts/               canonical JSON Schema and Python validator
-db/                               database setup and environment reference
+docs/DATABASE.md                  MongoDB setup and environment reference
 fixtures/                         shared API examples and replay inputs
 docs/handoffs/                     owner-1.md through owner-4.md
 docs/decisions/                    reviewed architecture/contract changes
@@ -153,7 +153,7 @@ Assign names to Owners 1–4 at kickoff. Each person uses a separate clone/workt
 | Owner | Owned paths | Required outputs |
 | --- | --- | --- |
 | **1: Frontend** | UI layouts/pages, `features/sky/`, `features/composer/`, frontend styles/components | Entire frontend: camera AR view, sensor pose and projection, 2D map fallback, weather, previews/expansion, post composer (text/link/image), voting UI, Clerk screens/client provider. |
-| **2: Backend** | `apps/web/src/server/`, `db/` | Python APIs, database/migrations, server-side Clerk verification, authorization, votes, storage, tracking ingestion, expiry and cleanup. |
+| **2: Backend** | `apps/web/src/server/`, `docs/DATABASE.md` | Python APIs, database initialization, server-side Clerk verification, authorization, votes, storage, tracking ingestion, expiry and cleanup. |
 | **3: Tracking** | `services/cloud-worker/`, atmospheric fixture inputs | Satellite/wind adapters, navigation, fusion, lineage, local advection, expiry proposals, replay, Python tests. |
 | **4: Integration** | Root tooling, `packages/contracts/`, shared fixture infrastructure, CI, end-to-end tests, deployment configuration | Bootstrap coordination, generated types, shared API client, local setup, integration checks, deployment and final merges. |
 
@@ -213,7 +213,7 @@ python -m drift_api.cli prepare
 python -m drift_api.cli serve
 ```
 
-The API listens on `http://127.0.0.1:3000`; it does not yet serve a frontend. Root `.env` and `apps/web/.env.local` load automatically, with explicit environment variables taking precedence. Configure `MONGODB_URI`, `MONGODB_DB`, Clerk public/secret keys, `TRACKING_INGEST_SECRET`, `DRIFT_DATASET_ID` and private S3 settings. Existing local credentials remain usable. See [database setup](db/README.md) for provisioning and media checks, and [worker setup](services/cloud-worker/README.md) for publishing. Prepare only creates synthetic fixtures and an isolated `*-demo` replay dataset; live provisioning is explicit.
+The API listens on `http://127.0.0.1:3000`; it does not yet serve a frontend. Root `.env` and `apps/web/.env.local` load automatically, with explicit environment variables taking precedence. Configure `MONGODB_URI`, `MONGODB_DB`, Clerk public/secret keys, `TRACKING_INGEST_SECRET`, `DRIFT_DATASET_ID` and private S3 settings. Existing local credentials remain usable. See [database setup](docs/DATABASE.md) for provisioning and media checks, and [worker setup](services/cloud-worker/README.md) for publishing. Prepare only creates synthetic fixtures and an isolated `*-demo` replay dataset; live provisioning is explicit.
 
 ```sh
 python -m drift_tools.cli check-contracts
