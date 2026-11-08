@@ -8,9 +8,9 @@ Repository: https://github.com/EliasCueto45/Drift
 
 ## Status and implementation baseline
 
-This is a development specification, not a working application. No app scaffold, credentials, deployment, or running services exist yet. Numeric defaults below are explicit MVP decisions. Start around Troy, New York with a regional web app and a clearly labeled, deterministic historical replay. Live observations and replay must use separate datasets and clocks.
+The Python API persists to MongoDB Atlas; the Python tracking worker publishes through authenticated endpoints. Shared contracts, deterministic synthetic fixtures, development tooling and tests run in Python. The frontend has not been implemented in this checkout. Numeric defaults below are MVP decisions. Live observations and replay use separate datasets and clocks.
 
-Chosen architecture: Next.js App Router + TypeScript as a mobile-first web app, Clerk users, PostgreSQL/PostGIS, private S3-compatible media storage, a Python/OpenCV tracking worker, and a camera AR sky view (rear camera feed plus a canvas overlay positioned from GPS, compass, and motion sensors) with a 2D sky-map fallback. The web app owns all public APIs. The worker submits authenticated lifecycle batches. Start with five-second polling. Owner 4 coordinates compatible runtime/dependency versions with the implementing owners and commits lockfiles during bootstrap.
+Architecture: Python 3.12 + FastAPI, PyMongo/Atlas, Clerk session JWT verification, private S3-compatible media storage and the existing Python/OpenCV tracking worker. FastAPI owns public APIs and tracking ingestion. A future browser frontend can consume these HTTP/JSON routes independently. Browser canvas, drawing and Clerk widgets may require browser JavaScript; there is no browser application to convert here yet. See [the Python migration decision](docs/decisions/0003-python-runtime.md).
 
 ```text
 Satellite imagery + altitude-aware winds
@@ -19,7 +19,7 @@ Satellite imagery + altitude-aware winds
                 |
      authenticated tracking batches
                 |
- Next.js API ---- Postgres/PostGIS
+ FastAPI API --- MongoDB Atlas
       |          private media storage
       |          Clerk identity
  Camera AR sky / discovery / composer UI (phone)
@@ -28,13 +28,12 @@ Satellite imagery + altitude-aware winds
 Planned directories:
 
 ```text
-apps/web/src/app/                  pages and API routes
-apps/web/src/server/               auth, DB, storage, lifecycle application
-apps/web/src/features/sky/         camera AR view, sensor pose, projection, map fallback, previews, expansion
+apps/web/src/server/drift_api/      Python API, auth, DB, storage, lifecycle
+apps/web/src/features/sky/         camera AR, sensor pose, projection, map fallback, previews, expansion
 apps/web/src/features/composer/    posts, links, image uploads, voting UI
 services/cloud-worker/            satellite/wind adapters and tracker
-packages/contracts/               JSON Schema and generated TS/Python types
-db/migrations/                    ordered SQL, including PostGIS
+packages/contracts/               canonical JSON Schema and Python validator
+db/                               database setup and environment reference
 fixtures/                         shared API examples and replay inputs
 docs/handoffs/                     owner-1.md through owner-4.md
 docs/decisions/                    reviewed architecture/contract changes
@@ -100,7 +99,7 @@ Created clouds use altitude-aware wind advection without satellite segmentation 
 
 ## Shared contract v1
 
-Owner 4 maintains versioned JSON Schema under `packages/contracts/` and generates TypeScript/Python bindings before feature branches diverge. Every boundary validates them. All IDs are opaque strings, timestamps ISO 8601 UTC, geometry GeoJSON WGS84, distances meters, velocities m/s. Every persisted mutable cloud/message has an integer `version`.
+Owner 4 maintains versioned JSON Schema under `packages/contracts/`. Python boundaries validate the same schema directly. All IDs are opaque strings, timestamps ISO 8601 UTC, geometry GeoJSON WGS84, distances meters, velocities m/s. Every persisted mutable cloud/message has an integer `version`.
 
 | Entity | Required fields/invariants |
 | --- | --- |
@@ -141,8 +140,8 @@ Upload URLs expire after five minutes; media playback URLs after one minute, bou
 
 ### Persistence and Clerk
 
-- Enable PostGIS, GiST indexes, metric radius queries and historical snapshots. Keep current state separate from history.
-- Clerk is identity authority. Use `ClerkProvider`, SDK/version-appropriate middleware or proxy, and server-side `auth()` for writes. Never trust user IDs in request bodies. Upsert local profiles on authenticated access; verified webhooks are optional later.
+- MongoDB replica-set transactions, unique/2dsphere indexes and historical snapshots keep current state separate from history. Atlas supplies the replica set; standalone MongoDB cannot run these transactions.
+- Clerk is identity authority. Python verifies RS256 session signatures, issuer, expiry and authorized browser origin before deriving the public profile. Never trust user IDs in request bodies. Frontend sign-in/provider integration remains to be built.
 - Enforce ownership on every mutation and asset completion. Clerk browser sessions never authorize worker routes. Atomic unique vote rows prevent retry inflation.
 - Expiry immediately removes content from API reads, rankings, and new media authorizations. Queue cleanup transactionally. Retry deletion of media, strokes, votes and payload rows within 24 hours; retain only non-content lineage metadata. Avoid logging message bodies. Document backup retention before production; app disappearance does not imply immediate backup erasure.
 - Initial per-user limits: 10 posts/minute, 60 vote changes/minute. Request geolocation explicitly and support manual location. Warn at composition that the content anchor is discoverable; never publish a user's location trail.
@@ -154,41 +153,21 @@ Assign names to Owners 1–4 at kickoff. Each person uses a separate clone/workt
 | Owner | Owned paths | Required outputs |
 | --- | --- | --- |
 | **1: Frontend** | UI layouts/pages, `features/sky/`, `features/composer/`, frontend styles/components | Entire frontend: camera AR view, sensor pose and projection, 2D map fallback, weather, previews/expansion, post composer (text/link/image), voting UI, Clerk screens/client provider. |
-| **2: Backend** | `apps/web/src/app/api/`, `apps/web/src/server/`, `db/` | APIs, database/migrations, server-side Clerk verification, authorization, votes, storage, tracking ingestion, expiry and cleanup. |
+| **2: Backend** | `apps/web/src/server/`, `db/` | Python APIs, database/migrations, server-side Clerk verification, authorization, votes, storage, tracking ingestion, expiry and cleanup. |
 | **3: Tracking** | `services/cloud-worker/`, atmospheric fixture inputs | Satellite/wind adapters, navigation, fusion, lineage, local advection, expiry proposals, replay, Python tests. |
 | **4: Integration** | Root tooling, `packages/contracts/`, shared fixture infrastructure, CI, end-to-end tests, deployment configuration | Bootstrap coordination, generated types, shared API client, local setup, integration checks, deployment and final merges. |
 
-Owner 1 owns the whole frontend, including root UI layouts/pages and the sole projection implementation. Owner 2 owns API routes even inside the Next.js app directory. Clerk responsibilities are explicit: Owner 1 handles client UI/provider placement; Owner 2 verifies identity and permissions server-side; Owner 4 assembles environment/deployment configuration.
+Owner 1 owns the whole frontend, including UI layouts/pages and the sole projection implementation. Owner 2 owns FastAPI routes and server logic. Clerk responsibilities are explicit: Owner 1 handles client sign-in/provider placement; Owner 2 verifies identity and permissions server-side; Owner 4 assembles environment/deployment configuration.
 
 Frontend ownership means design and integration accountability, not exclusive authorship. Owner 4 can help with isolated UI components after agreeing the files and interface with Owner 1. Keep sky/drawing interaction work with Owner 1; Owner 4 supplies fixtures and integration support. Every owner supplies subsystem tests and environment requirements; Owner 4 assembles shared setup and checks.
 
-Stabilize these component boundaries at kickoff, using generated contract types:
+Stabilize these component boundaries at kickoff, using canonical contract fields:
 
-```ts
-type CameraPose = {
-  longitude: number; latitude: number;
-  azimuthDeg: number;   // clockwise from true north
-  elevationDeg: number; // above the horizon
-  rollDeg: number;
-  horizontalFovDeg: number;
-  source: 'sensors' | 'simulated';
-};
-type SkyProjection = {
-  // CSS pixels relative to canvas, never device pixels.
-  // Built from a CameraPose in AR, or from a map viewport in the fallback.
-  // altitudeM is the cloud's estimated altitude; geoToScreen returns null when off screen.
-  screenToGeo(p: {x:number;y:number}, altitudeM: number): {longitude:number;latitude:number} | null;
-  geoToScreen(p: {longitude:number;latitude:number}, altitudeM: number): {x:number;y:number} | null;
-};
-// SkyView emits onCloudOpen(cloudId) and onPlace(cloudId, anchor).
-// Composer: {cloudId, anchor, projection, onSaved, onCancel}.
-// CreateCloudTool: {projection, onCreated, onCancel}.
-// VoteButton: {messageId, voteCount, viewerHasUpvoted, onChanged}.
-```
+Projection coordinates use CSS pixels relative to the canvas. Owner 1 supplies one altitude-aware projection with camera pose (viewer longitude/latitude, true-north azimuth, elevation, roll, horizontal field of view, and a sensors/simulated source), invertible screen-to-geographic and geographic-to-screen operations, and a null result for off-screen points or taps without an intersection. The 2D map is the fallback when camera or sensors are unavailable. Sky selection emits cloud IDs and geographic anchors; the composer consumes those values and emits saved/cancel events. Voting sends the desired boolean state and reconciles the returned count. These browser interfaces are still to be implemented.
 
 ### Milestones
 
-1. **Bootstrap together, Owner 4 coordinates.** Owner 4 sets up root tooling, contracts/generated bindings, shared API client, fixture infrastructure and CI. Owner 1 scaffolds the frontend; Owner 2 supplies server/API scaffolding, PostGIS/storage and migrations; Owner 3 scaffolds the worker and atmospheric fixtures. Owner 4 assembles Compose, environment templates and deterministic scattered/overcast/clear/merge/split/dissipation/outage/created-cloud scenarios. All four owners review contracts and run the same fixture before branching.
+1. **Bootstrap together, Owner 4 coordinates.** Owner 4 maintains Python tooling, schema validation, fixture infrastructure and CI. Owner 1 scaffolds the frontend; Owner 2 supplies FastAPI, MongoDB/storage and migrations; Owner 3 maintains the worker and atmospheric fixtures. Owner 4 assembles Compose, environment templates and deterministic scattered/overcast/clear/merge/split/dissipation/outage/created-cloud scenarios. All four owners review contracts and run the same fixture before branching.
 2. **First integrated slice.** Clerk sign-in → aim the camera (or simulated pose) at a fixture cloud → post text → see it on the same cloud from a second phone/browser → vote → preview reorders → double tap expands. Merge this against the actual API/database before adding all media modes. Demo bypasses satellite acquisition, never authentication.
 3. **Parallel features.** Owner 1 completes sky/discovery, artwork and created-cloud UI; Owner 2 completes APIs, authorization, persistence, expiry and cleanup; Owner 3 connects real tracking batches; Owner 4 maintains contract fixtures, verifies end-to-end behavior and resolves integration gaps with the responsible owners. Merge small complete slices frequently.
 4. **Final connection, Owner 4 leads.** Substitute worker output for fixture batches through the same API. Exercise drawings, lifecycle, concurrency and media on shared persistence. Rehearse a labeled historical replay. Live acquisition is a separate smoke check.
@@ -217,26 +196,36 @@ git push -u origin HEAD
 
 PR into main with behavior summary, contract impact, validation, and handoff link. Owner 4 coordinates merges; owners review changes affecting their interfaces. Rebase after shared-contract merges. Do not force-push main, commit secrets, overwrite teammates' changes, or discard unfamiliar merge conflicts.
 
-### Local setup target — not executable yet
+### Local Python setup
 
-Owner 4 must assemble and verify this setup with inputs from Owners 1–3, then replace this notice with actual prerequisites and tested commands. At present the commands below have no backing scripts.
-
-Prerequisites: Git, Docker Compose, pinned Node LTS/pnpm, pinned Python. Bootstrap supplies `.env.example` and a worker environment template. Create one shared development Clerk application, distribute keys privately, and configure each local/deployment URL.
+Prerequisites: Python 3.12 and Git. Use Atlas for persistence; Docker is optional for local MongoDB/media and needed by the documented CI replica-set test setup. Node and pnpm are no longer required.
 
 ```sh
-pnpm install --frozen-lockfile
-docker compose up -d db storage
-pnpm db:migrate
-pnpm db:seed
-pnpm dev
-# Separate terminal after creating/activating Python virtual environment:
-python -m pip install -r services/cloud-worker/requirements.txt
-python -m cloud_worker --mode replay --dataset troy-demo
+python -m venv .venv
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r requirements.lock.txt
+python -m pip install --no-deps --no-build-isolation -e . -e services/cloud-worker
+# Copy .env.example privately; keep existing .env and apps/web/.env.local.
+python -m drift_api.cli config-check
+python -m drift_api.cli db-check
+python -m drift_api.cli prepare
+python -m drift_api.cli serve
 ```
 
-Web variables: `DATABASE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `TRACKING_INGEST_SECRET`, `DRIFT_DATASET_ID`. Worker: `DRIFT_API_BASE_URL`, `TRACKING_INGEST_SECRET`, `DRIFT_DATASET_ID`, provider configuration. Owner 3 documents exact satellite/wind products, provider access, quality filters, region, and licenses when adapters are selected; do not assume a specific satellite remains operational.
+The API listens on `http://127.0.0.1:3000`; it does not yet serve a frontend. Root `.env` and `apps/web/.env.local` load automatically, with explicit environment variables taking precedence. Configure `MONGODB_URI`, `MONGODB_DB`, Clerk public/secret keys, `TRACKING_INGEST_SECRET`, `DRIFT_DATASET_ID` and private S3 settings. Existing local credentials remain usable. See [database setup](db/README.md) for provisioning and media checks, and [worker setup](services/cloud-worker/README.md) for publishing. Prepare only creates synthetic fixtures and an isolated `*-demo` replay dataset; live provisioning is explicit.
 
-Required bootstrap checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `python -m pytest services/cloud-worker/tests`. CI also verifies generated types match schemas and both languages accept the same fixtures.
+```sh
+python -m drift_tools.cli check-contracts
+python -m ruff check .
+python -m mypy
+python -W error -m pytest
+# Enable DRIFT_TEST_BACKEND=1 for real worker/API/MongoDB integration:
+python -W error -m pytest services/cloud-worker/tests
+python -m drift_tools.cli smoke
+```
+
+Backend tests require a disposable replica set via `DRIFT_TEST_MONGODB_URI`, a `mongod` on PATH or `MONGOD_BINARY`. They create/drop only unique `drift_test_*` databases and never use production `MONGODB_URI`. See CI for a Docker example. The development mock runs with `python -m drift_tools.cli mock`; replay uses `python -m drift_tools.cli replay --scenario scattered-advection --repeat`. Signed-in smoke steps are explicitly skipped without `SMOKE_AUTH_TOKEN`. Fixture regeneration: `python -m drift_tools.cli fixtures-gen`.
 
 ## Acceptance checks
 
@@ -260,7 +249,7 @@ Required bootstrap checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm bui
 
 These support implementation choices; the behavior and numeric defaults above are Drift decisions.
 
-- [Clerk Next.js App Router quickstart](https://clerk.com/docs/nextjs/getting-started/quickstart)
-- [Clerk server auth](https://clerk.com/docs/nextjs/reference/app-router/auth)
+- [Clerk manual JWT verification](https://clerk.com/docs/guides/sessions/manual-jwt-verification)
+- [MongoDB Python transactions](https://www.mongodb.com/docs/languages/python/pymongo-driver/current/crud/transactions/)
 - [NOAA derived-motion winds quick guide](https://www.goes.noaa.gov/documents/QuickGuide_BaselineDerivedMotionWinds.pdf)
 - [NOAA derived-motion winds algorithm](https://www.star.nesdis.noaa.gov/goesr/documents/ATBDs/Enterprise/ATBD_Enterprise_Derived_Motion_Winds_v4.2_2024_06_05.pdf)
