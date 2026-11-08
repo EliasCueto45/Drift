@@ -1,0 +1,147 @@
+/* Seen from above, as satellite imagery shows it: dark ground, white cloud. */
+.wrap {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 40%, #33433f 0%, #26332f 55%, #1c2623 100%);
+}
+
+.svg {
+  display: block;
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+}
+
+.svg:active {
+  cursor: grabbing;
+}
+
+.svg:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -6px;
+}
+
+.radius {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 1;
+  stroke-dasharray: 3 6;
+}
+
+.cloud {
+  cursor: pointer;
+  outline: none;
+}
+
+.cloudBody {
+  opacity: 0.88;
+  transition: opacity var(--t-fast);
+}
+
+.cloud[data-state="uncertain"] .cloudBody {
+  opacity: 0.55;
+}
+
+.cloud[data-selected] .cloudBody {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .cloud:not([data-selected]):hover .cloudBody {
+    opacity: 0.96;
+  }
+}
+
+.cloudHit {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 2;
+}
+
+.cloud:focus-visible .cloudHit {
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+.post {
+  fill: #ffffff;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
+.post[data-dim] {
+  opacity: 0.6;
+}
+
+.draft {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.5;
+}
+
+.me {
+  fill: #ffffff;
+  stroke: #2b6cb0;
+  stroke-width: 3;
+}
+
+.meHalo {
+  fill: rgba(43, 108, 176, 0.3);
+}
+
+.crosshair line {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.controls {
+  position: absolute;
+  right: calc(var(--safe-right) + 12px);
+  top: calc(var(--safe-top) + 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: var(--radius-l);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+
+.ctl {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.ctl:hover {
+  background: var(--paper-2);
+}
+
+.north {
+  position: absolute;
+  right: calc(var(--safe-right) + 12px);
+  top: calc(var(--safe-top) + 206px);
+  width: 44px;
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: var(--t-s);
+  color: #fff;
+}
+
+.placeHere {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(50% + 28px);
+  flex: none;
+  box-shadow: var(--shadow-2);
+}
