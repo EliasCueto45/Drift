@@ -1,5 +1,11 @@
 # AR follow-up handoffs from Owner 3
 
+## Last-known sky and supplied branding
+
+User-requested outage behavior now exports `last-known-sky.json` from the acknowledged worker checkpoint, excluding pending batches and message bodies. API opt-in `DRIFT_SKY_FALLBACK_FILE` enables public geometry-only `GET /sky?lastKnown=1` reads without Atlas; normal sky reads fall back on MongoDB availability errors. Existing canonical SkyResponse is unchanged; `X-Drift-Sky-Source: last-known` distinguishes the read-only source. Dataset isolation, radius and created-cloud expiry are retained. Frontend reloads warm this cache, time out live attempts before the next poll, label the retained observation stale, avoid message reconciliation against an unavailable DB, and disable posting/cloud creation on saved geometry. Owner 2 exact handoff: deploy the optional file path/shared read-only volume and preserve geometry-only access; restore Atlas separately. Owner 1 exact handoff: retain observation-age/read-only hints and do not present empty cached previews as no existing posts. Tests cover acknowledged/pending isolation, DB independence, distance/expiry/dataset checks, reload, recovery and hung reads.
+
+The supplied `Drift_logo_1.png` is copied unchanged to `apps/web/public/brand/drift-logo.png`. Responsive `DriftLogo` appears on onboarding, the map/simulated-view header and snapshot preview; the camera header stays unbranded at the user's request. Clerk `appearance.options` and browser/Apple icon metadata use the same asset. Owner 1 exact handoff: retain the provided artwork and keep branding out of clean captured sky pixels. No logo transformation or additional image generation was used.
+
 ## User-requested sky snapshot UI
 
 The camera/simulated sky now exposes a clean frame capture to Owner 1's bottom-left screenshot icon, above the map button. Local PNG composition includes the object-fit camera crop, sky/cloud visuals and published notes, excluding DOM chrome, reticle, selection glow, draft and debug renderers. A native dialog previews the file; a second explicit tap invokes file sharing so mobile user activation is retained. Unsupported/failed sharing offers download and long-press image options, and cancel does not trigger a download. Simulated/illustrated images retain provenance. No API/storage/schema changes or automatic frame uploads.

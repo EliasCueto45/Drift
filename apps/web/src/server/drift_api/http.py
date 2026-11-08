@@ -2,12 +2,14 @@ import json
 import logging
 import re
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from pymongo.errors import PyMongoError
 
 from .auth import check_origin, request_identity, upsert_profile, worker_auth
 from .database import close_database, transaction
@@ -19,6 +21,7 @@ from .validation import ApiError, fail, require, validate
 from .idempotency import create_once
 from .anonymous import COOKIE, SESSION_DAYS, anonymous_identity, new_token, start_session
 from .streaks import posting_streak, time_zone
+from .last_known import last_known_sky
 
 
 async def read_json(request, maximum=2 * 1024 * 1024):
@@ -58,6 +61,10 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
         }
         try:
             path, method, params = "/" + path, request.method, request.query_params
+            # This public geometry-only read intentionally bypasses Atlas and identity lookup.
+            if path == "/api/v1/sky" and method == "GET" and params.get("lastKnown") == "1":
+                result = await asyncio.to_thread(last_known_sky, params)
+                return JSONResponse(result, headers={**headers, "x-drift-sky-source": "last-known"})
             execute, user, status = None, None, 200
             create_kind = None
             guest_allowed = False
@@ -237,6 +244,11 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                 )
             return response
         except ApiError as error:
+            if path == "/api/v1/sky" and method == "GET" and error.code == "DATABASE_UNAVAILABLE":
+                try:
+                    return JSONResponse(await asyncio.to_thread(last_known_sky, params), headers={**headers, "x-drift-sky-source": "last-known"})
+                except ApiError:
+                    pass
             return JSONResponse(
                 {"error": {"code": error.code, "message": error.message, "requestId": request_id}},
                 status_code=error.status,
@@ -247,6 +259,11 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
             logging.getLogger("drift").error(
                 "API failure request=%s category=%s", request_id, type(error).__name__
             )
+            if path == "/api/v1/sky" and method == "GET" and isinstance(error, PyMongoError):
+                try:
+                    return JSONResponse(await asyncio.to_thread(last_known_sky, params), headers={**headers, "x-drift-sky-source": "last-known"})
+                except ApiError:
+                    pass
             return JSONResponse(
                 {
                     "error": {

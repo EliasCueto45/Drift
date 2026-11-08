@@ -3,6 +3,7 @@ import { Camera, Download, ScanLine, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { canShareSnapshot, saveSnapshot, shareSnapshot, type SnapshotCapture } from "./snapshot";
 import { captureSkyScreenshot } from "./screenshot";
+import { DriftLogo } from "@/features/brand/DriftLogo";
 import styles from "./snapshot.module.css";
 
 export function SnapshotButton({ capture, className, iconOnly = false, notify }: {
@@ -78,7 +79,7 @@ export function SnapshotButton({ capture, className, iconOnly = false, notify }:
       <dialog ref={dialog} className={styles.dialog} aria-labelledby="snapshot-title" onCancel={(e) => { e.preventDefault(); close(); }}>
         {preview && <>
           <header className={styles.header}>
-            <h2 id="snapshot-title">Your sky snapshot</h2>
+            <div className={styles.brandTitle}><DriftLogo variant="small" /><h2 id="snapshot-title">Your sky snapshot</h2></div>
             <button type="button" onClick={close} disabled={sharing} aria-label="Close snapshot preview"><X size={22} aria-hidden="true" /></button>
           </header>
           {/* A device-local blob cannot use the server image optimizer. */}

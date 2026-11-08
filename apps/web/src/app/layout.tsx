@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   title: "Drift",
   description: "Leave a message on a real cloud. Let the sky carry it.",
   applicationName: "Drift",
+  icons: {
+    icon: [{ url: "/brand/drift-logo.png", type: "image/png" }],
+    apple: [{ url: "/brand/drift-logo.png", type: "image/png" }],
+  },
   appleWebApp: { capable: true, title: "Drift", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };

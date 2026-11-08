@@ -29,6 +29,7 @@ export type TokenSource = () => Promise<string | null>;
 export interface Page<T> {
   data: T;
   nextCursor: string | null;
+  lastKnown?: boolean;
 }
 
 /**
@@ -44,13 +45,13 @@ export class DriftApi {
 
   private async request<T>(
     path: string,
-    init: RequestInit & { auth?: boolean; anonymous?: boolean } = {},
+    init: RequestInit & { auth?: boolean; anonymous?: boolean; publicRead?: boolean } = {},
   ): Promise<Page<T>> {
     const headers = new Headers(init.headers);
     headers.set("accept", "application/json");
     headers.set("X-Drift-Time-Zone", browserTimeZone());
     if (init.body) headers.set("content-type", "application/json");
-    const token = await this.getToken();
+    const token = init.publicRead ? null : await this.getToken();
     if (init.auth && !token) {
       if (init.anonymous && this.ensureAnonymous) await this.ensureAnonymous();
       else throw new DriftApiError(401, "UNAUTHENTICATED", "Sign in to continue");
@@ -95,7 +96,8 @@ export class DriftApi {
       );
     }
     const body = payload as { data: T; nextCursor?: string | null };
-    return { data: body.data, nextCursor: body.nextCursor ?? null };
+    return { data: body.data, nextCursor: body.nextCursor ?? null,
+      lastKnown: response.headers.get("x-drift-sky-source") === "last-known" };
   }
 
   sky(
@@ -104,6 +106,7 @@ export class DriftApi {
       radiusM: number;
       datasetId: string;
       cursor?: string | null;
+      lastKnown?: boolean;
     },
     signal?: AbortSignal,
   ) {
@@ -114,7 +117,8 @@ export class DriftApi {
       datasetId: params.datasetId,
     });
     if (params.cursor) query.set("cursor", params.cursor);
-    return this.request<SkyData>(`/sky?${query}`, { signal });
+    if (params.lastKnown) query.set("lastKnown", "1");
+    return this.request<SkyData>(`/sky?${query}`, { signal, publicRead: params.lastKnown });
   }
 
   cloud(id: string, signal?: AbortSignal) {

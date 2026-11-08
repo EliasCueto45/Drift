@@ -125,3 +125,25 @@ def test_live_coverage_grows_around_content_and_preserves_pending_checkpoint(tmp
     assert path.read_text() == original
     with pytest.raises(ValueError, match="coverage budget"):
         coverage_grid(tmp_path, max_axis_cells=128)
+
+
+def test_last_known_export_uses_acknowledged_state_not_pending_batch(tmp_path):
+    import json
+    from cloud_worker.live import write_last_known_sky
+    from cloud_worker.state import encode
+    from cloud_worker.wind import WindField
+    from test_engine import seeded, frame
+
+    engine = seeded()
+    engine.step(frame(5), WindField())
+    committed = encode(engine)
+    engine.step(frame(10), WindField())
+    journal = {"checkpoint": committed, "pending": {"nextState": encode(engine)}}
+    original = json.dumps(journal)
+    (tmp_path / "journal.json").write_text(original)
+    write_last_known_sky(tmp_path, engine.dataset_id, engine.run_id)
+    saved = json.loads((tmp_path / "last-known-sky.json").read_text())
+    assert saved["asOf"] == committed["previous"]["observedAt"]
+    assert saved["clouds"][0]["version"] == 2
+    assert "parcels" not in saved and "pending" not in saved and "messages" not in saved
+    assert (tmp_path / "journal.json").read_text() == original

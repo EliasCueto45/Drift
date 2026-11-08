@@ -1,5 +1,11 @@
 # MongoDB Atlas and Python API setup
 
+## Optional last-known sky during a database outage
+
+Set `DRIFT_SKY_FALLBACK_FILE` in the API environment to the absolute path of the live worker's `STATE_DIR/last-known-sky.json`. On separate hosts this requires a shared read-only snapshot volume or equivalent file delivery; without the optional file, existing API behavior is unchanged. The worker atomically exports only acknowledged cloud geometry/timestamps, never pending unaccepted batches, message bodies, user sessions, or credentials.
+
+`GET /api/v1/sky?lastKnown=1&datasetId=...&lat=...&lng=...&radiusM=...` reads that public geometry independently of Atlas/authentication lookup. Normal sky reads also return it on MongoDB availability failures. Responses use the existing canonical SkyResponse, `freshness: stale` (synthetic datasets remain replay), empty previews, and `X-Drift-Sky-Source: last-known`. Query dataset, radius, distance and known created-cloud expiry still apply. The frontend warms this read on reload, bounds live attempts to ten seconds, marks failed refreshes stale, and disables creation/posting while on saved positions. Notes still require Atlas; cached empty previews must not be described as proof a cloud has no messages. This is not a database replica or an offline posting queue.
+
 Use Python 3.12 and the root `requirements.lock.txt`. Install the root project and tracking worker as editable packages following the root README. The Next.js browser frontend also needs Node; see `apps/web/README.md`. Canonical HTTP payloads and the existing MongoDB collection format remain compatible with the previous backend; this port requires no data export or reset.
 
 Daily posting streaks and anonymous sessions use two automatically initialized collections: `posting_streaks` and `anonymous_sessions`. Both have TTL indexes on `expires_at`; Clerk streak rows omit expiry. Anonymous session credentials are stored only as SHA-256 hashes, with a random public principal ID. Restart the API after deployment so initialization runs. Existing Atlas connection settings and database remain valid; no separate API key or manual data migration is needed. Keep Next `/api` forwarding under the same public HTTPS origin so session cookies and `Set-Cookie` reach the browser.

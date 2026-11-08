@@ -12,6 +12,7 @@
 .dialog::backdrop { background: #071524b8; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .header h2 { font-size: 18px; margin: 0; }
+.brandTitle { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .header button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #e5ebf0; color: inherit; }
 .image { display: block; width: 100%; max-height: 60dvh; object-fit: contain; border-radius: 12px; background: #13283e; }
 .hint { font-size: 13px; line-height: 1.5; margin: 12px 0; }
