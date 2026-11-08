@@ -5,6 +5,9 @@ import { collection } from '../database.mjs';
 import { saveCloud,contains } from '../records.mjs';
 import { openTestDatabase,get } from './helpers.mjs';
 import { covers,validateGeometry,footprintDistanceM } from '../geometry.mjs';
+import { fork } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
 
 test('MongoDB indexes and transactions enforce containment, uniqueness and rollback',async()=>{
   const harness=await openTestDatabase(),{run,context}=harness;
@@ -34,4 +37,20 @@ test('geographic holes and boundary inclusion remain distinct',()=>{
   assert.equal(covers(polygon,{longitude:1,latitude:1}),false);
   assert.ok(footprintDistanceM(polygon,{longitude:1,latitude:1})>50000);
   assert.throws(()=>validateGeometry({type:'Polygon',coordinates:[[[0,0],[1,1],[0,1],[1,0],[0,0]]]}));
+});
+test('Python-compatible worker harness exposes an isolated MongoDB API',async()=>{
+  const child=fork(fileURLToPath(new URL('./backend-harness.mjs',import.meta.url)),[],{silent:true,env:{...process.env,TRACKING_INGEST_SECRET:'harness-test-worker'}});
+  child.stderr.resume();
+  try{
+    let base;
+    for await(const line of createInterface({input:child.stdout})){base=JSON.parse(line).base;break;}
+    assert.ok(base,'Harness must publish ready JSON');
+    const response=await fetch(base+'/api/internal/tracking/state?datasetId=backend-worker-demo',{headers:{authorization:'Bearer harness-test-worker'}});
+    assert.equal(response.status,200);const {data}=await response.json();assert.equal(data.sequence,0);assert.equal(data.trackingRunId,'run');assert.equal(data.clouds.length,0);
+  }finally{
+    if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>{
+      const timer=setTimeout(()=>child.kill(),10000);child.once('exit',()=>{clearTimeout(timer);resolve();});
+      if(child.connected)child.send('stop');else child.kill();
+    });
+  }
 });
