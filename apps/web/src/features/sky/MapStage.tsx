@@ -100,8 +100,9 @@ export function MapStage({
 
   function placeOrSelect(at: Anchor) {
     if (placing) {
-      const target = clouds.find((c) => c.cloud.id === selectedId);
-      if (target && multiPolygonContains(target.cloud.geometry.coordinates as number[][][][], at)) onPlace(target.cloud.id, at);
+      // Choosing where a new post goes: whichever cloud was tapped, at the tapped spot.
+      const target = hitCloud(at);
+      if (target) onPlace(target, at);
       else onPlaceMiss();
       return;
     }
@@ -119,7 +120,7 @@ export function MapStage({
       setView((v) => ({ center: new MapProjection(v.center, v.scale, size).panned(dx, dy).center, scale: v.scale }));
     } else if (e.key === "+" || e.key === "=") zoom(1.25);
     else if (e.key === "-") zoom(0.8);
-    else if (e.key === "Enter" && placing) placeOrSelect(view.center);
+    else if (e.key === "Enter" && placing) placeOrSelect(view.center); // keyboard: map centre
   };
 
   const ring25 = 25000 * view.scale;
@@ -136,7 +137,7 @@ export function MapStage({
         height={size.height}
         role="application"
         aria-roledescription="map"
-        aria-label={`Map of clouds near ${viewerIsReal ? "you" : "Troy, NY"}. Arrow keys pan, plus and minus zoom.${placing ? " Press Enter to place your post at the crosshair." : ""}`}
+        aria-label={`Map of clouds near ${viewerIsReal ? "you" : "Troy, NY"}. Arrow keys pan, plus and minus zoom.${placing ? " Tap a cloud, or press Enter to use the map centre, to place your post." : ""}`}
         tabIndex={0}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -221,12 +222,6 @@ export function MapStage({
           <circle cx={me.x} cy={me.y} r={9} className={styles.meHalo} />
           <circle cx={me.x} cy={me.y} r={5} className={styles.me} />
         </g>
-        {placing && (
-          <g aria-hidden="true" className={styles.crosshair}>
-            <line x1={size.width / 2 - 14} y1={size.height / 2} x2={size.width / 2 + 14} y2={size.height / 2} />
-            <line x1={size.width / 2} y1={size.height / 2 - 14} x2={size.width / 2} y2={size.height / 2 + 14} />
-          </g>
-        )}
       </svg>
       <div className={styles.controls}>
         <button type="button" className={styles.ctl} onClick={() => zoom(1.25)} aria-label="Zoom in">
@@ -242,11 +237,6 @@ export function MapStage({
       <p className={styles.north} aria-hidden="true">
         N
       </p>
-      {placing && (
-        <button type="button" className={`drift-primary ${styles.placeHere}`} onClick={() => placeOrSelect(view.center)}>
-          Place at the crosshair
-        </button>
-      )}
     </div>
   );
 }

@@ -3,11 +3,15 @@ import {
   ArrowLeft,
   ArrowRight,
   Camera,
+  Cloud as CloudIcon,
   Compass,
   Map as MapIcon,
   Orbit,
+  ScanLine,
   X,
 } from "lucide-react";
+import { isValidElement } from "react";
+import { captureSkyScreenshot } from "./screenshot";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "@/lib/api/ApiProvider";
 import { AccountButton, useDriftAuth } from "@/lib/auth/DriftAuth";
@@ -423,7 +427,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     const vh = video?.videoHeight ?? 0;
     return {
       view: d.view,
-      perms: `cam ${perms.current.camera} Â· motion ${perms.current.motion} Â· loc ${perms.current.location}`,
+      perms: `cam ${perms.current.camera} · motion ${perms.current.motion} · loc ${perms.current.location}`,
       orient: orientation.status,
       src: r.raw?.source ?? null,
       hz: Math.round(rate.current.hz),
@@ -462,7 +466,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           ? `${g.last.score.toFixed(2)} (base ${g.last.baseScore?.toFixed(2)})`
           : null,
       regMask: g.last
-        ? `cloud ${Math.round(g.last.cloudFraction * 100)}% Â· sky ${Math.round(g.last.validFraction * 100)}%`
+        ? `cloud ${Math.round(g.last.cloudFraction * 100)}% · sky ${Math.round(g.last.validFraction * 100)}%`
         : null,
     };
   };
@@ -525,12 +529,15 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   const selected = skyClouds.find((c) => c.cloud.id === selectedId) ?? null;
   const draftCloud = draft ? (skyClouds.find((c) => c.cloud.id === draft.cloudId) ?? null) : null;
   const activeDraft = draft && draftCloud ? draft : null;
-  const placingNow = placing && Boolean(selected);
+  // Placing: after the dock's cloud button, the next tap on any cloud picks the cloud and the spot.
+  const placingNow = placing && view !== "welcome" && !indoorBlocked;
   const sheetItem = skyClouds.find((c) => c.cloud.id === sheetId) ?? null;
   const composing = Boolean(activeDraft) && !placingNow;
 
-  function onAim(id: string | null) {
-    if (id && !placing && !draft && !sheetId) setSelectedId(id);
+  function startPost() {
+    setSheetId(null);
+    setSelectedId(null);
+    setPlacing(true);
   }
   function onTap(id: string | null) {
     if (draft) return;
@@ -555,6 +562,10 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     }
   }
   function onPlace(cloudId: string, anchor: Anchor) {
+    if (clouds.find((c) => c.cloud.id === cloudId)?.cloud.status !== "active") {
+      notify("That cloud isn't taking new posts right now. Pick another one.");
+      return;
+    }
     if (!placementInRange(viewer, anchor)) {
       notify(
         `Choose a spot within ${DISCOVERY_RADIUS_M / 1000} km so it appears in your nearby sky.`,
@@ -562,6 +573,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       return;
     }
     setPlacing(false);
+    setSelectedId(cloudId);
     if (view === "simulated") {
       // Bring the chosen spot above the composer so the words can be watched settling in.
       const target = clouds.find((c) => c.cloud.id === cloudId);
@@ -581,7 +593,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     }));
   }
   function onPlaceMiss() {
-    notify("Tap inside the cloud you picked.");
+    notify("Tap inside a cloud to place your post.");
   }
   const onDraftText = useCallback(
     (text: string) =>
@@ -612,9 +624,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
   // ---- Chrome ----
   const fresh = freshnessText(freshness, asOf, synthetic);
-  const showPanel =
-    selected && !placingNow && !activeDraft && !sheetId && view !== "welcome";
-  const canPost = selected?.cloud.status === "active";
+  const showPanel = selected && !placingNow && !activeDraft && !sheetId && view !== "welcome";
 
   const inView = summary?.visible ?? 0;
   const stageLabel = `${view === "simulated" ? "Simulated sky" : "Camera view of the sky"}. ${inView} tracked cloud${inView === 1 ? "" : "s"} in view. Posts are listed when you select a cloud.`;
@@ -628,16 +638,16 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     if (placingNow) {
       hint = (
         <>
-          Tap the spot on the cloud where your post goes
+          Tap a cloud where your post should stick
           <button type="button" onClick={() => setPlacing(false)}>
             Cancel
           </button>
         </>
       );
     } else if (skyStatus === "error" && !clouds.length)
-      hint = <>Can&apos;t reach Drift right now. Retryingâ€¦</>;
+      hint = <>Can&apos;t reach Drift right now. Retrying…</>;
     else if (skyStatus === "loading" || skyStatus === "idle")
-      hint = <>Finding clouds near youâ€¦</>;
+      hint = <>Finding clouds near you…</>;
     else if (skyStatus === "ready" && !clouds.length)
       hint = (
         <>No tracked clouds within {DISCOVERY_RADIUS_M / 1000} km right now.</>
@@ -655,7 +665,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           </button>
           <span className="tabular" aria-live="polite">
             {nudge > 0 ? "+" : ""}
-            {nudge}Â°
+            {nudge}°
           </span>
           <button
             type="button"
@@ -679,17 +689,16 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
             <ArrowRight size={18} aria-hidden="true" />
           )}
           Nearest cloud: turn {t < 0 ? "left" : "right"} about{" "}
-          {Math.max(5, Math.round(Math.abs(t) / 5) * 5)}Â°
+          {Math.max(5, Math.round(Math.abs(t) / 5) * 5)}°
         </>
       );
-    } else if (summary && summary.visible === 0)
-      hint = <>Look higher to find the clouds</>;
-    else if (!selected) hint = <>Aim at a cloud or tap one</>;
+    } else if (summary && summary.visible === 0) hint = <>Look higher to find the clouds</>;
+    else if (!selected) hint = <>Tap a cloud to read its posts</>;
   } else if (view === "map") {
     if (placingNow) {
       hint = (
         <>
-          Tap inside the cloud, or move the map and place at the crosshair
+          Tap a cloud where your post should stick
           <button type="button" onClick={() => setPlacing(false)}>
             Cancel
           </button>
@@ -715,7 +724,6 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           selectedId={view === "welcome" ? null : selectedId}
           placing={placingNow}
           draft={activeDraft}
-          onAim={view === "welcome" ? noop : onAim}
           onTap={view === "welcome" ? noop : onTap}
           onOpen={view === "welcome" ? noop : setSheetId}
           onPlace={onPlace}
@@ -787,7 +795,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           )}
           {view === "camera" && locationOff && !viewerIsReal && (
             <span className={styles.pill}>
-              Location off Â· assuming Troy, NY
+              Location off · assuming Troy, NY
             </span>
           )}
           {view !== "welcome" && !indoorBlocked && !composing && !sheetItem && (
@@ -824,6 +832,12 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
       {view !== "welcome" && !showPanel && !composing && (
         <div className={styles.bottomDock}>
+          <div className={styles.dockSide}>
+          {view !== "map" && (
+            <button type="button" className={styles.roundButton} onClick={() => void captureSkyScreenshot({ notify })} aria-label="Take a screenshot of the sky and its posts">
+              <ScanLine size={20} aria-hidden="true" />
+            </button>
+          )}
           {view === "map" ? (
             !handheld && !debug ? (
               <span />
@@ -837,7 +851,9 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
               <MapIcon size={20} aria-hidden="true" />
             </button>
           ) : null}
-          {hint ? <div className={styles.hint}>{hint}</div> : <span />}
+          </div>
+          {/* Keyed by its text: iOS Safari leaves stale glyphs behind a backdrop-filter when text changes in place. */}
+          {hint ? <div key={nodeText(hint)} className={styles.hint}>{hint}</div> : <span className={styles.hintSpacer} />}
           {view === "simulated" && (
             <button
               type="button"
@@ -848,6 +864,13 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
               <X size={20} aria-hidden="true" />
             </button>
           )}
+          {!placingNow && !indoorBlocked && clouds.length > 0 ? (
+            <button type="button" className={`${styles.roundButton} ${styles.postButton}`} onClick={startPost} aria-label="Write a post on a cloud">
+              <CloudIcon size={40} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          ) : (
+            <span className={styles.postButton} aria-hidden="true" style={{ visibility: "hidden" }} />
+          )}
         </div>
       )}
 
@@ -855,9 +878,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
         <CloudPanel
           item={selected}
           viewer={viewer}
-          canPost={canPost}
           onClose={() => setSelectedId(null)}
-          onPost={() => setPlacing(true)}
           onOpen={() => setSheetId(selected.cloud.id)}
         />
       )}
@@ -910,4 +931,13 @@ function noop() {}
 
 function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((t) => t.stop());
+}
+
+/** Plain text of a small React node (for keys). */
+function nodeText(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (isValidElement<{ children?: React.ReactNode }>(node)) return nodeText(node.props.children);
+  return "";
 }

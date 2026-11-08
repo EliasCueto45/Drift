@@ -15,9 +15,9 @@
   --vapor-shadow: #2e4666; /* shaded underside of vapor letters */
 
   /* State */
-  --accent: #3aa3dc;       /* light sky blue: primary action and your puff (white text is bold, 2.9:1) */
-  --accent-ink: #ffffff;
-  --accent-press: #2a8fc7;
+  --accent: #87ceeb;       /* sky blue: primary action and your puff, dark gray text on it */
+  --accent-ink: #2b333d;   /* 9.2:1 on the accent */
+  --accent-press: #6fc0e2;
   --accent-tint: #e1f2fc;
   --warn: #3f5873;         /* no orange anywhere: warnings are slate on pale blue */
   --warn-bg: #eaf1f8;
@@ -29,9 +29,9 @@
   /* On-camera chrome: captions over an unknown, moving background always sit on paper. */
   --scrim: rgba(27, 37, 51, 0.58);
   /* Liquid glass for on-camera bubbles: clear white, heavy blur, bright rim, dark ink. */
-  --glass-fill: linear-gradient(160deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.34) 55%, rgba(255, 255, 255, 0.46) 100%);
+  --glass-fill: linear-gradient(160deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.18) 55%, rgba(255, 255, 255, 0.28) 100%);
   --glass-blur: blur(16px) saturate(1.8) brightness(1.06);
-  --glass-rim: rgba(255, 255, 255, 0.7);
+  --glass-rim: rgba(255, 255, 255, 0.55);
   --glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 -1px 1px rgba(255, 255, 255, 0.35),

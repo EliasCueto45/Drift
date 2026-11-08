@@ -47,25 +47,6 @@
   cursor: crosshair;
 }
 
-.reticle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 26px;
-  height: 26px;
-  margin: -13px 0 0 -13px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  box-shadow: 0 1px 3px rgba(27, 37, 51, 0.45);
-  pointer-events: none;
-  transition: transform var(--t-fast) var(--ease-out), border-width var(--t-fast) var(--ease-out);
-}
-
-.reticle[data-on="true"] {
-  transform: scale(0.62);
-  border-width: 3px;
-}
-
 /* ---------- On-camera chrome: minimal, always on solid backing ---------- */
 .topbar {
   position: absolute;
@@ -170,8 +151,33 @@
   pointer-events: auto;
 }
 
-.hint {
+/* Left column: screenshot above map. Right: the large post button. Hint sits narrow between. */
+.dockSide {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 44px;
+}
+
+.postButton {
+  flex: none;
+  width: 88px;
+  height: 88px;
+}
+
+.hintSpacer {
   flex: 1;
+}
+
+.hint {
+  flex: 0 1 220px;
+  min-width: 0;
+  align-self: center;
+  /* Own compositing layer so text changes repaint cleanly behind the blur. */
+  transform: translateZ(0);
+  text-wrap: balance;
   display: flex;
   align-items: center;
   justify-content: center;
