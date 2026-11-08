@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from datetime import datetime, timezone
 
 from .delivery import ApiClient, deliver, flush
 from .engine import Engine
@@ -52,6 +53,7 @@ def main(argv=None):
     parser.add_argument("--state-dir", type=Path, default=Path("services/cloud-worker/.worker-state"))
     parser.add_argument("--output", type=Path, default=Path("services/cloud-worker/out/batches.jsonl"))
     parser.add_argument("--publish", action="store_true")
+    parser.add_argument("--max-observation-age-seconds", type=int)
     parser.add_argument("--batch-schema", type=Path)
     args = parser.parse_args(argv)
     try:
@@ -90,6 +92,10 @@ def main(argv=None):
             inputs = observation_inputs(args.manifest, args.state_dir/"cache") if args.manifest else synthetic_inputs(fixture)
             count = 0
             for frame, winds in inputs:
+                if args.mode == "live" and args.max_observation_age_seconds is not None:
+                    age = (datetime.now(timezone.utc)-frame.observed_at).total_seconds()
+                    if not 0 <= age <= args.max_observation_age_seconds:
+                        raise ValueError("observation became stale during acquisition; not publishing as live")
                 if deliver(journal, frame, winds, sink):
                     count += 1
             print(json.dumps({"mode": args.mode, "synthetic": not bool(args.manifest),

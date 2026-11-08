@@ -20,6 +20,23 @@ The CLI prints mode, synthetic flag, dataset, batch count and sequence. It never
 
 ## Real satellite inputs
 
+### Final hackathon: current real sky
+
+The final product targets current observations. Historical/synthetic replay is only a rehearsal and regression tool. Use the acquisition supervisor to discover fresh products automatically rather than maintain a manifest by hand:
+
+```sh
+# One current-sky acquisition/processing check, no backend needed:
+uv run --project services/cloud-worker --locked python -m cloud_worker.live --once
+# Run continuously; publishes to the real API configured in the environment:
+uv run --project services/cloud-worker --locked python -m cloud_worker.live --publish
+```
+
+The default is the Troy grid, `troy-live`, GOES-19's public bucket, five-minute polling, and separate state/output under `current-sky`. `--bucket` allows an explicitly selected operational satellite; never silently substitute another satellite or archived day. The supervisor searches the current and previous UTC hour, follows paginated catalogs, selects the newest two masks, matches available cloud height/infrared C13 within five minutes and earlier DMW within one hour, and uses the existing geolocation/tracking/outbox pipeline. If no mask is younger than 20 minutes, it reports unavailable and retries without processing old data as live. Future-dated observations are rejected. Missing optional products remain explicit approximations; no fixture fallback is permitted.
+
+Stop with Ctrl+C. Acquisition failures preserve cloud content and journals. Ingestion conflicts stop for reconciliation. A separate acquisition lock prevents overlapping supervisors; after a hard crash verify the old process has stopped before manually clearing stale locks. `current-manifest.json` records exact source URLs and discovery time. `acquisition-status.json` records current observation time and availability; a wind product being present does not imply a good vector exists near every cloud. Inspect per-cloud wind confidence as well.
+
+**Owners 1/2 MVP connection:** derive live/estimated/stale state from observation timestamps and confidence, show the satellite observation time/age, and keep the last known sky during outages. Never relabel old geometry as freshly observed because it was downloaded recently. The local acquisition-status file is operational diagnostics, not a new public API contract. A true live end-to-end demo still needs Owner 2's persistent ingestion/state API, then Owner 1's sky using that dataset. Check a fresh real observation reaches the browser before judging begins; do not substitute mock output for that acceptance check.
+
 The implemented adapter reads GOES ABI L2 Clear Sky Mask (`ABI-L2-ACMC` for CONUS), optional cloud-top height (`ABI-L2-ACHAC`), optional co-timed infrared Cloud and Moisture Imagery (`ABI-L2-CMIPC`, e.g. C13), and Derived Motion Winds (`ABI-L2-DMWC`), using each file's metadata rather than a hardcoded satellite longitude. Product names are selection guidance; verify the chosen source's actual variables, timestamps and quality flags before enabling live ingestion.
 
 1. Obtain a chronological series of actual regional products from [NOAA Open Data](https://www.noaa.gov/nodd/datasets) / the [GOES access guide](https://github.com/NOAA-Big-Data-Program/nodd-data-docs/blob/main/GOES/README.md). No provider credential is required for public GOES S3 objects.

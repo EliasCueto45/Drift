@@ -57,6 +57,11 @@ class Engine:
             raise ValueError("frame grid changed within a tracking run")
         if self.previous and frame.observed_at <= self.previous.observed_at:
             raise ValueError("observations must be strictly chronological")
+        if self.previous and (frame.observed_at-self.previous.observed_at).total_seconds() > 450:
+            # Five-minute CONUS acquisitions: an acquisition outage is unknown,
+            # even when no invalid frame was delivered to the engine.
+            self.cloud_evidence.clear()
+            self.parcel_evidence.clear()
         at = frame.observed_at
         motion = MotionField(winds, self.previous, frame)
         old = self.tracks
