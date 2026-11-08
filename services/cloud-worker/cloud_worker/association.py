@@ -86,7 +86,7 @@ def associate(tracks: dict[str, Track], regions: list[Region], frame: Frame, mot
             result[key] = Track(key, region.geometry, region.altitude_m, at, at,
                                 version=prior.version+1 if prior else 1,
                                 confidence=confidence,
-                                parents=prior.parents if prior else sorted(parents))
+                                parents=prior.parents if prior else sorted(parents),altitude=region.altitude)
             targets.append(key)
         for parent in parents:
             successors[parent] = sorted(targets)

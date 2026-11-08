@@ -1,5 +1,11 @@
 # Owner 3 — Tracking
 
+## AR follow-up
+
+Implemented optional per-cloud altitude provenance, datum-safe numerical direction helpers for frontend comparison, opt-in guarded parallax inverse sampling, and content-driven observed-cloud matching while retaining empty discovery and pending lineage. Checkpoints remain backward compatible; staged batches are not rewritten on policy changes. Live defaults to content policy; manual replay remains all policy. New code uses the migrated backend owner's MongoDB harness. See owner-3-ar.md for exact Owner 1/2/4 requests and decision 0003 for semantics and limitations. Camera rendering and fixed orientation storage remain owned by other workstreams. Paused operations changes remain stashed; user environment edits are preserved.
+
+Verification: 46 worker/shared/MongoDB tests pass with warnings as errors; root lint/typecheck/test/build and fixture validation pass. Canonical TS types regenerated. Current NOAA -> MongoDB smoke using content policy published two batches at 2026-11-08 05:31 UTC for observation 05:26:18.3 UTC, sequence 2, one cloud, sky freshness live. Parallax defaults off in that check because a verified vertical datum/geoid is not configured; numerical and synthetic NetCDF correction tests pass separately. No real-phone calibration test has been claimed.
+
 ## Integration with unmerged Owner 2 backend (`69f1f00`)
 
 Fetched and fast-forwarded `owner-3/tracking` to the backend branch (it already descended from our latest tracking work). Main and owner-2/backend were not modified. Added opt-in actual-backend/PostGIS worker tests and a manual current-NOAA-to-backend smoke script, all in Owner 3 paths. Fixed native JSON confidence export and NumPy checkpoint serialization after actual current imagery exposed float32 values; added a regression test.

@@ -56,7 +56,10 @@ def observation_inputs(manifest_path, cache):
         mask = product("mask")
         frame = load_goes(mask, grid, height_path=product("height"), image_path=product("image"),
                           accepted_dqf=tuple(manifest.get("acceptedDqf", [0])),
-                          assumed_height_m=manifest.get("assumedHeightM", 2000))
+                          assumed_height_m=manifest.get("assumedHeightM", 2000),
+                          height_reference=manifest.get('heightReference'),
+                          parallax=manifest.get('parallaxCorrection',False),
+                          geoid_undulation_m=manifest.get('geoidUndulationM'))
         if previous_at is not None and frame.observed_at <= previous_at:
             raise ValueError("manifest products must have strictly increasing acquisition times")
         previous_at = frame.observed_at

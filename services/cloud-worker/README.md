@@ -1,5 +1,13 @@
 # Drift cloud worker — Owner 3
 
+## Camera AR integration update
+
+The worker provides geographic cloud/anchor estimates; the frontend owns camera projection and viewer-facing billboards. Optional canonical `Cloud.altitude` now exposes meters, vertical datum, source, measured fraction, estimated status and parallax status. `wind.altitudeM` stays compatible. Unknown datum remains explicitly unknown. Read [the AR handoffs](../../docs/handoffs/owner-3-ar.md) and [decision 0003](../../docs/decisions/0003-ar-height-and-content-tracking.md).
+
+Current-sky acquisition defaults to `--tracking-policy content`: empty regions remain discoverable but do not undergo temporal matching; occupied clouds and pending descendants do. User-created clouds retain their independent wind/lifetime rules. Use `--tracking-policy all` for comparison. Policy is checkpointed and can change only after acknowledging any pending batch unchanged; do not reset the dataset sequence.
+
+For a manually verified manifest, `parallaxCorrection: true` enables approximate height-based inverse sampling. It requires a documented `heightReference` and, for sea-level/assumed pixels, a verified regional `geoidUndulationM`. There is no automatic default offset. The current catalog path leaves this correction disabled until its vertical metadata is reviewed. `cloud_worker.altitude` provides datum conversion and ECEF/ENU direction reference tests, not a second screen projection.
+
 Wind-assisted regional cloud tracking, local message/artwork advection, lineage, lifecycle evidence, durable delivery and replay. The service is integrated with Owner 2's backend HTTP handlers and embedded PostGIS tests; deployed services and browser verification remain separate acceptance checks. Offline output uses Owner 4's shared Python validator; publishing uses the same canonical batch schema. The backend state/ack requirements are in [the integration proposal](../../docs/decisions/owner-3-tracking-integration.md).
 
 ## Actual backend integration checks

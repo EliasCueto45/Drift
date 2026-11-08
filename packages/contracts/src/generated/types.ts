@@ -161,6 +161,17 @@ export interface Cloud {
   expiresAt: Timestamp | null;
   datasetId: Id;
   trackingRunId: Id;
+  /**
+   * Optional AR height provenance. Existing wind.altitudeM remains the numerical cloud-plane estimate.
+   */
+  altitude?: {
+    meters: number;
+    reference: "unknown" | "mean_sea_level" | "wgs84_ellipsoid";
+    source: string;
+    estimated: boolean;
+    measuredFraction: number;
+    parallaxCorrected: boolean;
+  };
 }
 /**
  * This interface was referenced by `DriftContracts`'s JSON-Schema

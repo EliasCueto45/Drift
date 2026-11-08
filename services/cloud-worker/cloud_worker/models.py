@@ -67,6 +67,10 @@ class Frame:
     source: str
     image: np.ndarray | None = None
     height_estimated: bool = False
+    height_reference: str = 'unknown'
+    height_source: str = 'unspecified'
+    measured_height: np.ndarray | None = None
+    parallax_corrected: bool = False
 
     def __post_init__(self):
         iso(self.observed_at)
@@ -78,6 +82,10 @@ class Frame:
         self.cloudy = self.cloudy.astype(bool)
         self.valid = self.valid.astype(bool)
         self.valid &= np.isfinite(self.altitude_m)
+        if self.height_reference not in ('unknown','mean_sea_level','wgs84_ellipsoid'):
+            raise ValueError('unsupported height reference')
+        if self.measured_height is not None and self.measured_height.shape != self.grid.shape:
+            raise ValueError('height provenance must match grid')
 
 
 @dataclass
@@ -85,6 +93,7 @@ class Region:
     geometry: MultiPolygon  # metric CRS, never emitted directly
     mask: np.ndarray
     altitude_m: float
+    altitude: dict | None = None
 
 
 @dataclass
@@ -101,6 +110,7 @@ class Track:
     parents: list[str] = field(default_factory=list)
     expires_at: datetime | None = None
     creator_id: str | None = None
+    altitude: dict | None = None
 
 
 @dataclass

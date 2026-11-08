@@ -1,7 +1,7 @@
-"""Manual online check: current NOAA -> actual backend -> embedded PostGIS.
+"""Manual online check: current NOAA -> actual backend -> MongoDB replica set.
 
 Run from repo root after installing backend dependencies. This is not a deployed
-Postgres/Clerk/S3 check. Uses an isolated disposable backend and new worker state.
+Atlas/Clerk/S3 check. Uses an isolated disposable backend and new worker state.
 """
 import json
 import os
@@ -38,7 +38,7 @@ def run():
         persisted=api.state('troy-backend-live')
         assert persisted['sequence']>0
         sky=api.request('GET','/api/v1/sky?lat=42.73&lng=-73.68&radiusM=50000&datasetId=troy-backend-live')
-        print(json.dumps({'backend':'actual handlers, embedded PostGIS','sequence':persisted['sequence'],
+        print(json.dumps({'backend':'actual handlers, MongoDB replica set','sequence':persisted['sequence'],
                           'clouds':len(persisted['clouds']),'freshness':sky['data']['freshness'],
                           'stateDirectory':str(state)}),flush=True)
     finally:

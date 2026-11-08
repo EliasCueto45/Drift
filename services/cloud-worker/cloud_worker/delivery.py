@@ -109,6 +109,7 @@ def synchronize(engine, state):
                                       value["status"], value["confidence"], value["parentIds"],
                                       timestamp(value["expiresAt"]) if value["expiresAt"] else None,
                                       value["creatorId"])
+            engine.tracks[key].altitude=value.get('altitude')
         if value["status"] == "expired":
             engine.tracks[key].status = "expired"
     engine.tracks = {k: t for k, t in engine.tracks.items() if k in server_ids or t.status == "expired"}

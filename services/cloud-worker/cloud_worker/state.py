@@ -24,7 +24,10 @@ def frame_json(frame):
             "cloudy": frame.cloudy.tolist(), "valid": frame.valid.tolist(),
             "altitudeM": frame.altitude_m.tolist(), "source": frame.source,
             "image": frame.image.tolist() if frame.image is not None else None,
-            "heightEstimated": frame.height_estimated}
+            "heightEstimated": frame.height_estimated,"heightReference":frame.height_reference,
+            "heightSource":frame.height_source,
+            "measuredHeight":frame.measured_height.tolist() if frame.measured_height is not None else None,
+            "parallaxCorrected":frame.parallax_corrected}
 
 
 def read_frame(value):
@@ -34,7 +37,9 @@ def read_frame(value):
                  np.array(value["cloudy"], bool), np.array(value["valid"], bool),
                  np.array(value["altitudeM"], float), value["source"],
                  np.array(value["image"], np.float32) if value["image"] is not None else None,
-                 value["heightEstimated"])
+                 value["heightEstimated"],value.get('heightReference','unknown'),value.get('heightSource','unspecified'),
+                 np.array(value['measuredHeight'],bool) if value.get('measuredHeight') is not None else None,
+                 value.get('parallaxCorrected',False))
 
 
 def encode(engine):
@@ -57,7 +62,7 @@ def encode(engine):
             "runId": engine.run_id, "sequence": engine.sequence, "tracks": tracks,
             "parcels": parcels, "pending": engine.pending,
             "cloudEvidence": evidence(engine.cloud_evidence), "parcelEvidence": evidence(engine.parcel_evidence),
-            "previous": frame_json(engine.previous)}
+            "previous": frame_json(engine.previous),"contentOnly":engine.content_only}
 
 
 def decode(value):
@@ -65,6 +70,7 @@ def decode(value):
         raise ValueError("unsupported worker checkpoint")
     engine = Engine(Grid(**value["grid"]), value["datasetId"], value["runId"])
     engine.sequence = value["sequence"]
+    engine.content_only = value.get('contentOnly',False)
     for item in value["tracks"]:
         t = dict(item)
         t["geometry"] = shape(t["geometry"])

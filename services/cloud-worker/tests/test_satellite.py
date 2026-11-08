@@ -40,6 +40,10 @@ def test_goes_navigation_quality_and_acquisition_time(tmp_path):
     assert frame.cloudy[frame.valid].all()
     assert frame.height_estimated
     assert frame.grid.transformer(True).transform(0, 0) == pytest.approx((-75, 0))
+    corrected=load_goes(path,g,parallax=True,geoid_undulation_m=0)
+    assert corrected.parallax_corrected and corrected.valid.any()
+    with pytest.raises(ValueError,match='geoid'):
+        load_goes(path,g,parallax=True)
 
 
 def test_dmw_quality_units_and_height_fallback(tmp_path):
