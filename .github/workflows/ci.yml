@@ -3,45 +3,33 @@ on:
   push: { branches: [main] }
   pull_request:
 jobs:
-  node:
+  python:
     runs-on: ubuntu-latest
     env:
       TRACKING_INGEST_SECRET: ci-only-secret
+      DRIFT_TEST_BACKEND: "1"
+      DRIFT_TEST_MONGODB_URI: mongodb://127.0.0.1:27017/?directConnection=true
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      # Generated types + fixtures must be committed and in sync with the schema.
-      - run: pnpm check:contracts
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-      # Tests the smoke tooling itself against the fixture-backed mock API.
-      # Replace with the real stack (web + db) once Owner 2's API exists.
-      - name: smoke (mock API)
-        run: |
-          PORT=3000 node tools/mock-api.mjs &
-          sleep 2
-          pnpm smoke
-  python:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # Worker integration tests invoke the shared Node mock and smoke suite.
-      # Jobs use separate runners; the node job's installation is not available here.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip, cache-dependency-path: packages/contracts/python/requirements.txt }
-      - run: pip install -r packages/contracts/python/requirements.txt
-      - run: |
-          if [ -f services/cloud-worker/requirements.txt ]; then pip install -r services/cloud-worker/requirements.txt; fi
-      # Both languages must accept the same fixtures and agree on wind math.
-      - run: python -m pytest packages/contracts/python -q
-      - run: |
-          if [ -d services/cloud-worker/tests ]; then python -m pytest services/cloud-worker/tests -q; fi
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.lock.txt
+      - run: python -m pip install -r requirements.lock.txt
+      - run: python -m pip install --no-deps --no-build-isolation -e . -e services/cloud-worker
+      - name: Disposable MongoDB replica set
+        run: |
+          docker run -d --name drift-test-mongo -p 27017:27017 mongo:8.2 --replSet drift-test --bind_ip_all
+          python -m drift_tools.init_mongo
+      - run: python -m drift_tools.cli check-contracts
+      - run: python -m ruff check .
+      - run: python -m mypy
+      - run: python -W error -m pytest
+      - run: python -W error -m pytest services/cloud-worker/tests
+      - name: Verify fixture generation is reproducible
+        run: |
+          python -m drift_tools.cli fixtures-gen
+          git diff --exit-code -- fixtures
+      - if: always()
+        run: docker rm -f drift-test-mongo
