@@ -1,0 +1,126 @@
+{
+  "clear-sky": {
+    "name": "clear-sky",
+    "description": "No observed clouds. UI shows Draw a cloud.",
+    "datasetId": "fx-clear",
+    "synthetic": true,
+    "expect": {
+      "activeCloudIds": []
+    }
+  },
+  "created-cloud": {
+    "name": "created-cloud",
+    "description": "Created cloud (creator + 24h expiry) advects with wind; never merges with observed clouds.",
+    "datasetId": "fx-created",
+    "synthetic": true,
+    "expect": {
+      "activeCloudIds": [
+        "cld_created",
+        "cld_created_neighbor"
+      ]
+    }
+  },
+  "dissipation": {
+    "name": "dissipation",
+    "description": "Clear obs #1 (t+5), #2 (t+10), #3 (t+16): only after #3 does the cloud dissipate and the note expire.",
+    "datasetId": "fx-dissipation",
+    "synthetic": true,
+    "expect": {
+      "expiredCloudIds": [
+        "cld_ds"
+      ],
+      "expiredMessageIds": [
+        "msg_ds_1"
+      ],
+      "notExpiredAfterSequence": {
+        "3": [
+          "msg_ds_1"
+        ]
+      }
+    }
+  },
+  "merge": {
+    "name": "merge",
+    "description": "A and B merge into M; both notes transfer exactly once, predecessors retire.",
+    "datasetId": "fx-merge",
+    "synthetic": true,
+    "expect": {
+      "activeCloudIds": [
+        "cld_mg_m"
+      ],
+      "expiredCloudIds": [
+        "cld_mg_a",
+        "cld_mg_b"
+      ],
+      "messageCloud": {
+        "msg_mg_a": "cld_mg_m",
+        "msg_mg_b": "cld_mg_m"
+      }
+    }
+  },
+  "outage": {
+    "name": "outage",
+    "description": "Data gap > 30 min: cloud goes uncertain, content is held, nothing is deleted.",
+    "datasetId": "fx-outage",
+    "synthetic": true,
+    "expect": {
+      "uncertainCloudIds": [
+        "cld_out"
+      ],
+      "notExpiredMessageIds": [
+        "msg_out_1"
+      ]
+    }
+  },
+  "overcast": {
+    "name": "overcast",
+    "description": "Broad cover; footprint shrinks on the east side but notes keep distinct anchors (no bbox rescale).",
+    "datasetId": "fx-overcast",
+    "synthetic": true,
+    "expect": {
+      "activeCloudIds": [
+        "cld_overcast"
+      ],
+      "minAnchorSeparationM": 19000
+    }
+  },
+  "scattered-advection": {
+    "name": "scattered-advection",
+    "description": "Two clouds; west wind 10 m/s moves everything ~6 km east over 10 min.",
+    "datasetId": "fx-scattered",
+    "synthetic": true,
+    "expect": {
+      "activeCloudIds": [
+        "cld_scat_a",
+        "cld_scat_b"
+      ],
+      "movedMessages": {
+        "msg_scat_a1": {
+          "eastM": 6000
+        },
+        "msg_scat_b1": {
+          "eastM": 6000
+        }
+      }
+    }
+  },
+  "split": {
+    "name": "split",
+    "description": "M splits into S1 (west) and S2 (east); each note goes to exactly one child by containment.",
+    "datasetId": "fx-split",
+    "synthetic": true,
+    "expect": {
+      "activeCloudIds": [
+        "cld_sp_s1",
+        "cld_sp_s2"
+      ],
+      "expiredCloudIds": [
+        "cld_sp_m"
+      ],
+      "messageCloud": {
+        "msg_sp_l": "cld_sp_s1",
+        "msg_sp_r": "cld_sp_s2"
+      }
+    }
+  }
+}
