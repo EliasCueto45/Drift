@@ -45,9 +45,13 @@ Draw a cloud opens a geographic outline editor from camera, simulated or map vie
 
 The composer retains its request/key when a response is lost, including the original cloud version. Editing or receiving a definite rejection starts a new attempt. The API keeps transactional receipts for 24 hours without copying post bodies. Posts show public author names with a neutral fallback for older profiles. Polling revalidates local posts and loaded rows, preserving moved anchors and removing held/expired/deleted entries; the shared 50 km discovery policy remains in effect. Account changes clear local post/vote state. Read `docs/decisions/0004-connected-cloud-post-flows.md` for the additive contract fields and retry semantics.
 
+## Sky snapshots
+
+Camera and simulated 3D views offer a **Snapshot** icon at the bottom left, above the map button. Capture composites the camera's visible crop (or rendered sky) and published notes into a local PNG, excluding controls, selection glow, reticle, drafts, panels and debug overlays. The preview offers the native file share sheet when `navigator.canShare({files})` succeeds and always offers **Save image**. The share action is a separate tap after encoding so iOS user activation is preserved. Cancellation keeps the preview; failed sharing leaves saving available. On phones, users can also touch and hold the preview for browser image options. Simulated/illustrated imagery keeps a small provenance label. Nothing is posted to the API or uploaded automatically. Real iOS/Android share destinations depend on the browser, OS and installed apps; verify on the demo phones.
+
 ## Third-party assets
 
-- Indoor/outdoor scene model: Places365 ResNet18 (MIT CSAIL, CC BY), int8, run on the device with onnxruntime-web. Camera frames never leave the phone. Credits and build steps: `public/models/CREDITS.md`, `scripts/build_scene_model.py`. `npm run dev`/`build` copy the onnxruntime WASM into `public/ort/` (gitignored).
+- Indoor/outdoor scene model: Places365 ResNet18 (MIT CSAIL, CC BY), int8, run on the device with onnxruntime-web. Camera frames are processed locally; only an explicit snapshot export sends a still image to the user's chosen destination. Credits and build steps: `public/models/CREDITS.md`, `scripts/build_scene_model.py`. `npm run dev`/`build` copy the onnxruntime WASM into `public/ort/` (gitignored).
 - Virtual cloud photos (CC0 / public domain): `public/clouds/CREDITS.md`, built with `scripts/make_cloud_sprites.py`.
 
 ## Anonymous posting and daily streaks
