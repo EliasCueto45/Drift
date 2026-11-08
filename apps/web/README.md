@@ -19,7 +19,11 @@ npm run dev:https    # https://localhost:3001 for camera/compass on this machine
 
 Phones need HTTPS for camera and motion sensors: `cloudflared tunnel --url https://localhost:3001` (then set `DRIFT_APP_ORIGIN` to the tunnel URL for the real API, and add it to Clerk's allowed origins).
 
-Environment (`apps/web/.env.local`, never committed): `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` enables Clerk sign-in. Optional: `NEXT_PUBLIC_DRIFT_DATASET_ID` (default `fx-scattered`), `NEXT_PUBLIC_DRIFT_DEV_AUTH=mock` (a visibly labeled dev sign-in only the mock accepts; ignored when Clerk is configured), `NEXT_PUBLIC_DRIFT_DECLINATION_DEG` (compass correction override), `DRIFT_API_ORIGIN` (proxy target, default `http://127.0.0.1:3000`).
+Environment (`apps/web/.env.local`, never committed): `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` enables Clerk sign-in. Optional: `NEXT_PUBLIC_DRIFT_DATASET_ID` (default `troy-live`), `NEXT_PUBLIC_DRIFT_DEV_AUTH=mock` (a visibly labeled dev sign-in only the mock accepts; ignored when Clerk is configured), `NEXT_PUBLIC_DRIFT_DECLINATION_DEG` (compass correction override), `DRIFT_API_ORIGIN` (proxy target, default `http://127.0.0.1:3000`).
+
+The default live dataset must be provisioned and receiving worker observations. For the synthetic mock or seeded fixture API, open `/?dataset=fx-scattered&view=map` or set the UI dataset explicitly; a mock has no `troy-live` observations. Keep the UI dataset matched to the worker's provisioned live ID, without renaming replay datasets or mixing their clocks.
+
+On phones in user mode, the camera view waits for outdoor classification and hides clouds, posts and cloud creation indoors. The map opens after an outdoor check; desktop map access remains available. Developer mode (`?debug=1`) retains indoor/simulated testing. These checks guide the browser experience; API streaks count successful posts and do not claim trusted outdoor proof.
 
 Demo URLs: `/?view=simulated` (simulated sky over Troy, labeled), `/?view=map`, `/?dataset=fx-overcast` (any fixture scenario; always labeled synthetic).
 

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { indoorProbability, softmax, topScenes } from "./sceneClassifier";
-import { isDaylight, outdoorScore, sunElevationDeg, VisibilityTracker } from "./visibility";
+import { isDaylight, nightOutdoorScore, outdoorScore, sunElevationDeg, VisibilityTracker } from "./visibility";
 
 const TROY = { lat: 42.7302, lon: -73.6788 };
 
@@ -60,13 +60,21 @@ describe("indoor/outdoor from the scene classifier", () => {
 
 describe("VisibilityTracker", () => {
   const noon = 40;
-  it("hides clouds immediately at night", () => {
-    expect(new VisibilityTracker().update(0, -20, 0.8)).toEqual({ state: "hidden", reason: "night" });
+  it("shows night stand-ins only once outdoors is known", () => {
+    const t = new VisibilityTracker();
+    expect(t.update(0, -20, null)).toEqual({ state: "hidden", reason: "checking" });
+    expect(t.update(500, -20, 0.8)).toEqual({ state: "hidden", reason: "night" });
+  });
+
+  it("blocks indoors at night too", () => {
+    expect(new VisibilityTracker().update(0, -20, -0.8)).toEqual({ state: "hidden", reason: "indoors" });
   });
 
   it("switches indoors only after sustained evidence", () => {
     const t = new VisibilityTracker();
     let s = t.update(0, noon, null);
+    expect(s).toEqual({ state: "hidden", reason: "checking" });
+    s = t.update(250, noon, 0.8);
     expect(s.state).toBe("visible");
     // A one-second blip of indoor evidence does not switch.
     for (let ms = 500; ms <= 1500; ms += 500) s = t.update(ms, noon, -1);
@@ -75,5 +83,26 @@ describe("VisibilityTracker", () => {
     // Sustained indoor evidence does.
     for (let ms = 8500; ms <= 20000; ms += 500) s = t.update(ms, noon, -1);
     expect(s).toEqual({ state: "hidden", reason: "indoors" });
+  });
+
+  it("decides on the first reading without waiting", () => {
+    const t = new VisibilityTracker();
+    expect(t.update(0, noon, -0.9)).toEqual({ state: "hidden", reason: "indoors" });
+  });
+});
+
+describe("nightOutdoorScore", () => {
+  const sky = { meanLuma: 35, topLuma: 30, darkFraction: 0.85 };
+  const room = { meanLuma: 125, topLuma: 140, darkFraction: 0.05 };
+  it("reads a dark frame pointed up as outdoors", () => {
+    expect(nightOutdoorScore(sky, null, 50)!).toBeGreaterThan(0.5);
+  });
+  it("reads a lit room as indoors whichever way the phone points", () => {
+    expect(nightOutdoorScore(room, 0.9, 50)!).toBeLessThan(-0.5);
+    expect(nightOutdoorScore(room, null, 0)!).toBeLessThan(-0.5);
+  });
+  it("gives no verdict for darkness seen level, or a covered lens", () => {
+    expect(nightOutdoorScore(sky, null, 0)).toBeNull();
+    expect(nightOutdoorScore({ meanLuma: 2, topLuma: 2, darkFraction: 1 }, null, 60)).toBeNull();
   });
 });

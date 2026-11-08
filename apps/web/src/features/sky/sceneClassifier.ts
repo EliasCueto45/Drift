@@ -6,11 +6,37 @@
  * Model and labels: public/models (built by scripts/build_scene_model.py).
  */
 
+/** Brightness of the frame, 0-255 luma. Night evidence: a night sky is mostly dark, a lit room is not. */
+export interface FrameLight {
+  meanLuma: number;
+  /** Mean luma of the top third (what sits highest in the view). */
+  topLuma: number;
+  /** Share of pixels darker than 50. */
+  darkFraction: number;
+}
+
 export interface SceneResult {
-  /** Probability that the camera sees an indoor scene, 0-1. */
-  pIndoor: number;
+  /** Probability that the camera sees an indoor scene, 0-1; null when too dark to classify. */
+  pIndoor: number | null;
   top: { name: string; p: number }[];
+  light: FrameLight;
   ms: number;
+}
+
+/** Luma statistics of an RGBA square image (side x side). */
+export function frameLight(px: ArrayLike<number>, side: number): FrameLight {
+  const n = side * side;
+  const third = Math.floor(side / 3) * side;
+  let sum = 0;
+  let top = 0;
+  let dark = 0;
+  for (let i = 0; i < n; i++) {
+    const l = 0.299 * px[i * 4]! + 0.587 * px[i * 4 + 1]! + 0.114 * px[i * 4 + 2]!;
+    sum += l;
+    if (i < third) top += l;
+    if (l < 50) dark++;
+  }
+  return { meanLuma: sum / n, topLuma: third ? top / third : sum / n, darkFraction: dark / n };
 }
 
 export function softmax(logits: ArrayLike<number>): Float64Array {
@@ -39,7 +65,7 @@ export function topScenes(probs: ArrayLike<number>, names: string[], k = 3) {
 const SIZE = 224;
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
-/** Mean brightness below this: lens covered, in a pocket, pitch dark. No verdict. */
+/** Mean brightness below this: too dark for the scene model (it was trained on lit scenes). */
 const MIN_LUMA = 30;
 
 type OrtModule = typeof import("onnxruntime-web/wasm");
@@ -77,7 +103,8 @@ let canvas: HTMLCanvasElement | null = null;
 
 /**
  * Classify what the camera currently shows (the visible, cover-cropped part of the video,
- * centre square). Null when there is no frame yet, it is too dark, or the model is missing.
+ * centre square). Null when there is no frame yet or the model is missing. A frame too dark
+ * for the model still returns its brightness (pIndoor null): darkness is night evidence.
  */
 export async function classifyFrame(video: HTMLVideoElement, viewport: { width: number; height: number }): Promise<SceneResult | null> {
   const model = await loadSceneModel();
@@ -97,19 +124,18 @@ export async function classifyFrame(video: HTMLVideoElement, viewport: { width: 
   const px = ctx.getImageData(0, 0, SIZE, SIZE).data;
 
   const n = SIZE * SIZE;
+  const light = frameLight(px, SIZE);
+  if (light.meanLuma < MIN_LUMA) return { pIndoor: null, top: [], light, ms: performance.now() - t0 };
   const input = new Float32Array(3 * n);
-  let luma = 0;
   for (let i = 0; i < n; i++) {
     const r = px[i * 4]!, g = px[i * 4 + 1]!, b = px[i * 4 + 2]!;
-    luma += 0.299 * r + 0.587 * g + 0.114 * b;
     input[i] = (r / 255 - MEAN[0]!) / STD[0]!;
     input[n + i] = (g / 255 - MEAN[1]!) / STD[1]!;
     input[2 * n + i] = (b / 255 - MEAN[2]!) / STD[2]!;
   }
-  if (luma / n < MIN_LUMA) return null;
 
   const { ort, session } = model;
   const out = await session.run({ [session.inputNames[0]!]: new ort.Tensor("float32", input, [1, 3, SIZE, SIZE]) });
   const probs = softmax(out[session.outputNames[0]!]!.data as Float32Array);
-  return { pIndoor: indoorProbability(probs, model.indoor), top: topScenes(probs, model.names), ms: performance.now() - t0 };
+  return { pIndoor: indoorProbability(probs, model.indoor), top: topScenes(probs, model.names), light, ms: performance.now() - t0 };
 }

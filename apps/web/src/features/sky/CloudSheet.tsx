@@ -260,17 +260,8 @@ export function CloudSheet({
             </button>
           ))}
         </div>
-        <div
-          id="cloud-sheet-list"
-          role="tabpanel"
-          aria-labelledby={`tab-${scope}`}
-          className={styles.sheetBody}
-        >
-          {scope === "nearby" && (
-            <p className={styles.panelMeta}>
-              Within {DISCOVERY_RADIUS_M / 1000} km of you, most upvoted first.
-            </p>
-          )}
+        <div id="cloud-sheet-list" role="tabpanel" aria-labelledby={`tab-${scope}`} className={styles.sheetBody}>
+          {scope === "nearby" && <p className={styles.panelMeta}>Within {DISCOVERY_RADIUS_M / 1000} km of you, most puffs first.</p>}
           {list.length > 0 && (
             <ul className={styles.panelList}>
               {list.map((m) => (

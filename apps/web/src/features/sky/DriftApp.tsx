@@ -45,7 +45,7 @@ import {
   type SceneSummary,
 } from "./SkyStage";
 import { useSky } from "./useSky";
-import { outdoorScore, sunElevationDeg, VisibilityTracker, type CloudVisibility } from "./visibility";
+import { nightOutdoorScore, outdoorScore, sunElevationDeg, VisibilityTracker, type CloudVisibility } from "./visibility";
 import { classifyFrame, loadSceneModel, type SceneResult } from "./sceneClassifier";
 import { useLatest, useMediaQuery } from "@/lib/useLatest";
 import { DebugHud, type DebugSnapshot } from "@/features/debug/DebugHud";
@@ -276,30 +276,34 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
   // ---- Can real clouds be seen? (night / indoors -> virtual clouds, no matching) ----
   // On-device scene classifier (sceneClassifier.ts): indoor vs. outdoor from the camera frame.
-  const sceneRef = useRef<{ result: SceneResult; at: number } | null>(null);
+  // elevationDeg: where the phone pointed when the frame was taken (night darkness only counts pointing up).
+  const sceneRef = useRef<{ result: SceneResult; at: number; elevationDeg: number | null } | null>(null);
+  const reading = orientation.reading;
   const [tracker] = useState(() => new VisibilityTracker());
-  const [visibility, setVisibility] = useState<CloudVisibility>({ state: "visible", reason: null });
+  const [visibility, setVisibility] = useState<CloudVisibility>({ state: "hidden", reason: "checking" });
   const [visOverride, setVisOverride] = useState<"auto" | "visible" | "hidden">("auto");
   const sunRef = useRef(0);
   const [isNight, setIsNight] = useState(false);
   const sensed = useLatest({ viewer });
   useEffect(() => {
-    // At night clouds are hidden regardless, so the model isn't loaded or run.
-    if (view !== "camera" || isNight) return;
+    // Runs day and night: indoors hides everything at any hour (see nightOutdoorScore).
+    if (view !== "camera") return;
     let busy = false;
     const id = window.setInterval(() => {
       const video = document.querySelector("video");
       if (busy || !video || document.visibilityState !== "visible") return;
       busy = true;
+      const vectors = reading.current.vectors;
+      const elevationDeg = vectors ? poseAngles(vectors, 0).elevationDeg : null;
       classifyFrame(video, { width: window.innerWidth, height: window.innerHeight })
         .then((result) => {
-          if (result) sceneRef.current = { result, at: performance.now() };
+          if (result) sceneRef.current = { result, at: performance.now(), elevationDeg };
         })
         .catch((error: unknown) => console.warn("Scene classification failed", error))
         .finally(() => (busy = false));
     }, 1500);
     return () => window.clearInterval(id);
-  }, [view, isNight]);
+  }, [view, reading]);
   useEffect(() => {
     if (view !== "camera") return;
     const tick = () => {
@@ -309,7 +313,12 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       setIsNight(sun < -6);
       const scene = sceneRef.current;
       // Only a recent classification counts (the phone may have moved since).
-      const score = outdoorScore(scene && performance.now() - scene.at < 6000 ? scene.result.pIndoor : null);
+      const recent = scene && performance.now() - scene.at < 6000 ? scene : null;
+      const score = !recent
+        ? null
+        : sun < -6
+          ? nightOutdoorScore(recent.result.light, recent.result.pIndoor, recent.elevationDeg)
+          : outdoorScore(recent.result.pIndoor);
       const next = tracker.update(performance.now(), sun, score);
       setVisibility((prev) => (prev.state === next.state && prev.reason === next.reason ? prev : next));
     };
@@ -323,8 +332,17 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       ? visibility
       : visOverride === "visible"
         ? { state: "visible", reason: null }
-        : { state: "hidden", reason: visibility.reason ?? (isNight ? "night" : "indoors") };
+        : { state: "hidden", reason: visibility.reason === "night" || isNight ? "night" : "indoors" };
   const cloudsHidden = view === "camera" && effectiveVis.state === "hidden";
+  // Drift is meant to get people outside: in user mode the camera sky shows nothing indoors
+  // (no clouds, no posts) and the dock asks the user to step out. Developer mode keeps the
+  // virtual-cloud fallback so indoor testing still works.
+  const indoorBlocked = cloudsHidden && effectiveVis.reason !== "night" && !debug;
+  // The 2D map is a reward for being outside: on a phone in user mode it opens only from the
+  // camera once the scene check says outdoors. Desktops have no camera to check, so keep it.
+  // Outdoors means "visible" by day or "hidden: night" after dark (night is only reported outdoors).
+  const mapAllowed = debug || !handheld || (view === "camera" && (effectiveVis.state === "visible" || effectiveVis.reason === "night"));
+  const skyClouds = indoorBlocked ? [] : clouds;
 
   // Plain function: SkyStage reads the latest one through a ref each frame.
   const getCameraPose = (): Omit<CameraPose, "hfovDeg"> | null => {
@@ -435,10 +453,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       sunEl: sunRef.current,
       outdoor: tracker.score,
       scene: sceneRef.current
-        ? `wasm ${Math.round(sceneRef.current.result.ms)}ms · indoor ${sceneRef.current.result.pIndoor.toFixed(2)} · ${sceneRef.current.result.top.map((t) => `${t.name} ${t.p.toFixed(2)}`).join(", ")}`
-        : isNight
-          ? "off (night)"
-          : "loading…",
+        ? `${Math.round(sceneRef.current.result.ms)}ms · indoor ${sceneRef.current.result.pIndoor?.toFixed(2) ?? "dark"} · luma ${Math.round(sceneRef.current.result.light.meanLuma)}/${Math.round(sceneRef.current.result.light.topLuma)} dark ${Math.round(sceneRef.current.result.light.darkFraction * 100)}% · el ${sceneRef.current.elevationDeg?.toFixed(0) ?? "-"} · ${sceneRef.current.result.top.map((t) => `${t.name} ${t.p.toFixed(2)}`).join(", ")}`
+        : "loading…",
       reg: g.last ? `${g.last.state}${g.last.accepted ? " +" : ""} ${Math.round(g.last.ms)}ms` : null,
       regFix: `az ${g.az.toFixed(1)} el ${g.el.toFixed(1)}`,
       regScore:
@@ -472,12 +488,16 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     // alignment (and says so); it doesn't take the user out of the sky.
     if (cam.status !== "granted") {
       stopStream(cam.stream);
+      // User mode on a phone: no camera means no outdoor check, so no map either.
+      const toMap = debug || !handheld;
       setReason(
         cam.status === "denied"
-          ? "Drift needs the camera to show posts on the sky. Allow it with the aA button in Safari's address bar, then Website Settings. The map has the same clouds and posts."
-          : "This browser can't open the camera, so here's the map with the same clouds and posts.",
+          ? `Drift needs the camera to show posts on the sky. Allow it with the aA button in Safari's address bar, then Website Settings.${toMap ? " The map has the same clouds and posts." : ""}`
+          : toMap
+            ? "This browser can't open the camera, so here's the map with the same clouds and posts."
+            : "This browser can't open the camera. Try Safari or Chrome on your phone.",
       );
-      setView("map");
+      if (toMap) setView("map");
       return;
     }
     setStream(cam.stream);
@@ -501,13 +521,12 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
   // ---- Selection & posting ----
   // Derived, so a cloud that leaves the sky (expired, merged, out of range) simply deselects.
-  const selected = clouds.find((c) => c.cloud.id === selectedId) ?? null;
-  const draftCloud = draft
-    ? (clouds.find((c) => c.cloud.id === draft.cloudId) ?? null)
-    : null;
+  // Indoors (user mode) nothing is selectable, so open panels and drafts hide until outside.
+  const selected = skyClouds.find((c) => c.cloud.id === selectedId) ?? null;
+  const draftCloud = draft ? (skyClouds.find((c) => c.cloud.id === draft.cloudId) ?? null) : null;
   const activeDraft = draft && draftCloud ? draft : null;
   const placingNow = placing && Boolean(selected);
-  const sheetItem = clouds.find((c) => c.cloud.id === sheetId) ?? null;
+  const sheetItem = skyClouds.find((c) => c.cloud.id === sheetId) ?? null;
   const composing = Boolean(activeDraft) && !placingNow;
 
   function onAim(id: string | null) {
@@ -601,7 +620,11 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   const stageLabel = `${view === "simulated" ? "Simulated sky" : "Camera view of the sky"}. ${inView} tracked cloud${inView === 1 ? "" : "s"} in view. Posts are listed when you select a cloud.`;
 
   let hint: React.ReactNode = null;
-  if (view === "camera" || view === "simulated") {
+  if (indoorBlocked && effectiveVis.reason === "checking") {
+    hint = <>Point your camera at the sky…</>;
+  } else if (indoorBlocked) {
+    hint = <>Clouds and posts only appear outside. Step outdoors and point your camera at the sky.</>;
+  } else if (view === "camera" || view === "simulated") {
     if (placingNow) {
       hint = (
         <>
@@ -687,7 +710,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           mode={view === "camera" ? "camera" : "simulated"}
           stream={stream}
           getPose={view === "camera" ? getCameraPose : getSimPose}
-          clouds={clouds}
+          clouds={skyClouds}
           freshness={freshness}
           selectedId={view === "welcome" ? null : selectedId}
           placing={placingNow}
@@ -703,7 +726,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           interactive={view !== "welcome"}
           settle={settle}
           onRegister={view === "camera" ? onRegister : undefined}
-          virtualClouds={cloudsHidden ? (effectiveVis.reason === "night" ? "night" : "day") : "off"}
+          virtualClouds={cloudsHidden && !indoorBlocked ? (effectiveVis.reason === "night" || isNight ? "night" : "day") : "off"}
           debug={debug}
         />
       )}
@@ -731,7 +754,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
             {fresh.label}
           </span>
           {view === "simulated" && <span className={styles.pill}>Simulated view</span>}
-          {cloudsHidden && (
+          {cloudsHidden && !indoorBlocked && (
             <span className={styles.pill}>{effectiveVis.reason === "night" ? "Night" : "Indoors"} · clouds shown where they are</span>
           )}
           {debug && view === "camera" && (
@@ -749,13 +772,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
               Developer
             </button>
           )}
-          {view === "camera" && (
-            <button
-              type="button"
-              className={styles.signInButton}
-              onClick={() => setCalibrating((c) => !c)}
-              aria-pressed={calibrating}
-            >
+          {view === "camera" && !indoorBlocked && (
+            <button type="button" className={styles.signInButton} onClick={() => setCalibrating((c) => !c)} aria-pressed={calibrating}>
               <Compass size={16} aria-hidden="true" />
               {matched && !cloudsHidden
                 ? "Matched to visible clouds"
@@ -772,7 +790,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
               Location off Â· assuming Troy, NY
             </span>
           )}
-          {view !== "welcome" && !composing && !sheetItem && (
+          {view !== "welcome" && !indoorBlocked && !composing && !sheetItem && (
             <button
               type="button"
               className={styles.signInButton}
@@ -799,7 +817,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           handheld={handheld}
           reason={reason}
           onLookUp={lookUp}
-          onMap={() => setView("map")}
+          onMap={mapAllowed ? () => setView("map") : undefined}
           onSimulated={debug ? () => setView("simulated") : undefined}
         />
       )}
@@ -814,16 +832,11 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
               {handheld ? <Camera size={20} aria-hidden="true" /> : <Orbit size={20} aria-hidden="true" />}
             </button>
             )
-          ) : (
-            <button
-              type="button"
-              className={styles.roundButton}
-              onClick={() => leaveCamera("map")}
-              aria-label="Show the map"
-            >
+          ) : mapAllowed ? (
+            <button type="button" className={styles.roundButton} onClick={() => leaveCamera("map")} aria-label="Show the map">
               <MapIcon size={20} aria-hidden="true" />
             </button>
-          )}
+          ) : null}
           {hint ? <div className={styles.hint}>{hint}</div> : <span />}
           {view === "simulated" && (
             <button
@@ -872,7 +885,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           onClose={() => setSheetId(null)}
         />
       )}
-      {creatingCloud && (
+      {creatingCloud && !indoorBlocked && (
         <CloudCreator
           viewer={viewer}
           datasetId={datasetId}

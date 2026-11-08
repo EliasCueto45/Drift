@@ -1,6 +1,7 @@
 /** Public runtime configuration. Live and replay datasets never share an ID. */
 export const config = {
-  datasetId: process.env.NEXT_PUBLIC_DRIFT_DATASET_ID ?? "fx-scattered",
+  /** Default: the live GOES satellite dataset. Fixtures stay reachable with ?dataset=fx-... */
+  datasetId: process.env.NEXT_PUBLIC_DRIFT_DATASET_ID ?? "troy-live",
   /** Fixture/replay datasets start with fx- or end with -demo; they are always labeled synthetic. */
   isSyntheticDataset(id: string) {
     return id.startsWith("fx-") || id.endsWith("-demo");

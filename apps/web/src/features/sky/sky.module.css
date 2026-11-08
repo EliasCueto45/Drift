@@ -97,33 +97,35 @@
   min-height: 30px;
   padding: 4px 11px;
   border-radius: 999px;
-  background: var(--scrim);
-  color: #fff;
+  border: 1px solid var(--glass-rim);
+  background: var(--glass-fill);
+  box-shadow: var(--glass-shadow);
+  color: var(--ink);
   font-size: var(--t-s);
   font-weight: 600;
   line-height: 1.2;
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .pill[data-tone="stale"] {
-  background: rgba(92, 64, 10, 0.78);
+  color: var(--ink-soft);
 }
 
 .dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #ffd166;
+  background: #4fb3ea;
   flex: none;
 }
 
 .pill[data-tone="live"] .dot {
-  background: #6ee7a8;
+  background: #1fa463;
 }
 
 .pill[data-tone="stale"] .dot {
-  background: #ffb020;
+  background: var(--stale);
 }
 
 .roundButton {
@@ -132,11 +134,12 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 0;
-  background: var(--scrim);
-  color: #fff;
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid var(--glass-rim);
+  background: var(--glass-fill);
+  box-shadow: var(--glass-shadow);
+  color: var(--ink);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   transition: transform var(--t-fast) var(--ease-out), background var(--t-fast);
 }
 
@@ -175,20 +178,22 @@
   gap: 8px;
   min-height: 44px;
   padding: 8px 14px;
-  border-radius: var(--radius-l);
-  background: var(--scrim);
-  color: #fff;
+  border-radius: 22px;
+  border: 1px solid var(--glass-rim);
+  background: var(--glass-fill);
+  box-shadow: var(--glass-shadow);
+  color: var(--ink);
   font-size: var(--t-s);
   font-weight: 600;
   text-align: center;
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .hint button {
-  border: 0;
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  border: 1px solid var(--glass-rim);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink);
   border-radius: 999px;
   min-height: 32px;
   padding: 0 12px;

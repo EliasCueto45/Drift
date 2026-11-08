@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUp, ExternalLink } from "lucide-react";
+import { ExternalLink, Wind } from "lucide-react";
 import { useState } from "react";
 import { useDriftAuth } from "@/lib/auth/DriftAuth";
 import type { Message } from "@/lib/contracts";
@@ -80,12 +80,12 @@ export function PostItem({ message }: { message: Message; mine?: boolean }) {
         type="button"
         className={styles.vote}
         aria-pressed={v.viewerHasUpvoted}
-        aria-label={`${v.viewerHasUpvoted ? "Remove upvote" : "Upvote"}, ${v.voteCount} ${v.voteCount === 1 ? "upvote" : "upvotes"}`}
+        aria-label={`${v.viewerHasUpvoted ? "Take back your puff" : "Give a puff"}, ${v.voteCount} ${v.voteCount === 1 ? "puff" : "puffs"}`}
         data-pending={v.pending || undefined}
         disabled={v.pending || deleting}
         onClick={() => void toggleVote(message)}
       >
-        <ArrowUp size={18} strokeWidth={2.25} aria-hidden="true" />
+        <Wind size={18} strokeWidth={2.25} aria-hidden="true" />
         <span className="tabular">{v.voteCount}</span>
       </button>
     </li>
