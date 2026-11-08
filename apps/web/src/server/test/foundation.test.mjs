@@ -1,31 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { PGlite } from '@electric-sql/pglite';
-import { postgis } from '@electric-sql/pglite-postgis';
-import { transaction,one } from '../database.mjs';
+import { collection } from '../database.mjs';
 import { saveCloud,contains } from '../records.mjs';
+import { openTestDatabase,get } from './helpers.mjs';
+import { covers,validateGeometry,footprintDistanceM } from '../geometry.mjs';
 
-test('foundation migration enforces spatial containment and rolls back failed operations',async()=>{
-  const pg=new PGlite({extensions:{postgis}});
-  const source={connect:async()=>({query:(...args)=>pg.query(...args),release(){}})};
-  const run=fn=>transaction(fn,source);
-  try {
-    await pg.exec(await readFile(new URL('../../../../../db/migrations/001_backend.sql',import.meta.url),'utf8'));
-    const batch=JSON.parse(await readFile(new URL('../../../../../fixtures/scenarios/scattered-advection/batch-001.json',import.meta.url),'utf8'));
-    const cloud=batch.snapshots[0];
+test('MongoDB indexes and transactions enforce containment, uniqueness and rollback',async()=>{
+  const harness=await openTestDatabase(),{run,context}=harness;
+  try{
+    const batch=JSON.parse(await readFile(new URL('../../../../../fixtures/scenarios/scattered-advection/batch-001.json',import.meta.url),'utf8')),cloud=batch.snapshots[0];
     await run(async db=>{
-      await db.query("INSERT INTO datasets(id,mode,run_id,observed_at) VALUES($1,'replay',$2,$3)",[batch.datasetId,batch.trackingRunId,batch.observedAt]);
+      await collection(db,'datasets').insertOne({_id:batch.datasetId,id:batch.datasetId,mode:'replay',run_id:batch.trackingRunId,sequence:0,observed_at:new Date(batch.observedAt),received_at:db.now});
       await saveCloud(db,cloud);
-      const [longitude,latitude]=cloud.geometry.coordinates[0][0][0];
-      await contains(db,cloud.id,{longitude,latitude});
+      const [longitude,latitude]=cloud.geometry.coordinates[0][0][0];await contains(db,cloud.id,{longitude,latitude});
     });
     await assert.rejects(run(async db=>{
-      await db.query('INSERT INTO profiles(id,public_profile) VALUES($1,$2)',['rolled-back',{id:'rolled-back',displayName:null,avatarUrl:null}]);
+      await collection(db,'profiles').insertOne({_id:'rolled-back',public_profile:{id:'rolled-back',displayName:null,avatarUrl:null}});
       await contains(db,cloud.id,{longitude:0,latitude:0});
     }),{status:422});
-    assert.equal(await one(pg,"SELECT 1 FROM profiles WHERE id='rolled-back'"),undefined);
-    assert.equal((await one(pg,'SELECT count(*)::int n FROM cloud_history')).n,1);
-    assert.ok((await one(pg,"SELECT indexname FROM pg_indexes WHERE indexname='clouds_footprint_gist'")).indexname);
-  } finally {await pg.close();}
+    assert.equal(await get(context,'profiles','rolled-back'),undefined);
+    assert.equal(await collection(context,'cloud_history').countDocuments(),1);
+    const indexes=await harness.source.db.collection('clouds').indexes();
+    assert.ok(indexes.some(i=>i.key.footprint==='2dsphere'));
+    await run(db=>collection(db,'votes').insertOne({_id:'vote-1',message_id:'m',user_id:'u'}));
+    await assert.rejects(run(db=>collection(db,'votes').insertOne({_id:'vote-2',message_id:'m',user_id:'u'})),{code:11000});
+  }finally{await harness.close();}
+});
+test('geographic holes and boundary inclusion remain distinct',()=>{
+  const polygon={type:'Polygon',coordinates:[[[0,0],[2,0],[2,2],[0,2],[0,0]],[[0.5,0.5],[0.5,1.5],[1.5,1.5],[1.5,0.5],[0.5,0.5]]]};
+  validateGeometry(polygon);
+  assert.equal(covers(polygon,{longitude:0,latitude:1}),true);
+  assert.equal(covers(polygon,{longitude:1,latitude:1}),false);
+  assert.ok(footprintDistanceM(polygon,{longitude:1,latitude:1})>50000);
+  assert.throws(()=>validateGeometry({type:'Polygon',coordinates:[[[0,0],[1,1],[0,1],[1,0],[0,0]]]}));
 });

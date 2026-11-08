@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { fail, requireThat } from './validation.mjs';
+import { collection } from './database.mjs';
 
 export function workerAuth(request) {
   const secret = process.env.TRACKING_INGEST_SECRET;
@@ -8,6 +9,7 @@ export function workerAuth(request) {
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) fail(401, 'UNAUTHENTICATED', 'Worker credential required');
 }
 export async function clerkIdentity(required = false) {
+  if(!process.env.CLERK_SECRET_KEY)fail(503,'NOT_CONFIGURED','Set the complete CLERK_SECRET_KEY in apps/web/.env.local');
   const { auth, clerkClient } = await import('@clerk/nextjs/server');
   const { userId } = await auth();
   if (!userId) {
@@ -23,10 +25,11 @@ export function checkOrigin(request) {
   if (origin) requireThat(origin === new URL(request.url).origin, 'Cross-origin mutation forbidden', 'FORBIDDEN', 403);
 }
 export async function upsertProfile(db, user) {
-  if (user) await db.query(`INSERT INTO profiles(id,public_profile) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET public_profile=EXCLUDED.public_profile`, [user.id, user]);
+  if(user) await collection(db,'profiles').updateOne({_id:user.id},{$set:{id:user.id,public_profile:user}},{upsert:true});
 }
 export async function rateLimit(db, userId, action, max) {
-  const { rows: [row] } = await db.query(`INSERT INTO rate_windows(user_id,action,window_at,count) VALUES($1,$2,date_trunc('minute',now()),1)
-    ON CONFLICT(user_id,action,window_at) DO UPDATE SET count=rate_windows.count+1 RETURNING count`, [userId,action]);
-  if (row.count > max) fail(429, 'RATE_LIMIT', 'Try again next minute');
+  const now=db.now??new Date(),window=Math.floor(now.getTime()/60000);
+  const id=JSON.stringify([userId,action,window]),rows=collection(db,'rate_windows');
+  await rows.updateOne({_id:id},{$inc:{count:1},$setOnInsert:{user_id:userId,action,expires_at:new Date((window+3)*60000)}},{upsert:true});
+  if((await rows.findOne({_id:id})).count>max) fail(429,'RATE_LIMIT','Try again next minute');
 }

@@ -3,7 +3,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import sharp from 'sharp';
 import { parseBuffer } from 'music-metadata';
-import { one } from './database.mjs';
+import { collection } from './database.mjs';
 import { cloudRecord, messageRecord, publicMessage } from './records.mjs';
 import { exact, fail, requireThat } from './validation.mjs';
 import { rateLimit } from './auth.mjs';
@@ -66,11 +66,11 @@ export async function uploadUrl(db,input,user,client=storageClient()) {
   const asset={id,ownerId:user.id,...input,state:'pending',createdAt};
   const uploadKey=`pending/${id}/${randomUUID()}`, objectKey=`ready/${id}/${randomUUID()}`;
   const url=await getSignedUrl(client,objectCommand(PutObjectCommand,uploadKey,{ContentType:input.mimeType,ContentLength:input.sizeBytes}),{expiresIn:300});
-  await db.query('INSERT INTO assets(id,owner_id,payload,upload_key,object_key,upload_expires_at) VALUES($1,$2,$3,$4,$5,$6)',[id,user.id,asset,uploadKey,objectKey,expiresAt]);
+  await collection(db,'assets').insertOne({_id:id,id,owner_id:user.id,payload:asset,upload_key:uploadKey,object_key:objectKey,upload_expires_at:new Date(expiresAt),created_at:db.now??new Date(),attached_message_id:null,staging_deleted:false});
   return {data:{assetId:id,uploadUrl:url,expiresAt}};
 }
 export async function completeAsset(db,id,user,client=storageClient()) {
-  const row=await one(db,'SELECT * FROM assets WHERE id=$1',[id]);
+  const row=await collection(db,'assets').findOne({_id:id});
   if(!row) fail(404,'NOT_FOUND','Asset not found');
   requireThat(row.owner_id===user.id,'Asset owner only','FORBIDDEN',403);
   if(row.payload.state==='ready') return {data:row.payload};
@@ -82,11 +82,11 @@ export async function completeAsset(db,id,user,client=storageClient()) {
   // verified bytes after completion. No ready key is exposed to the browser.
   await client.send(objectCommand(PutObjectCommand,row.object_key,{Body:inspected.bytes,ContentType:row.payload.mimeType,CacheControl:'private, no-store'}));
   const payload={...row.payload,...inspected.metadata,sizeBytes:inspected.bytes.length,state:'ready'};
-  await db.query('UPDATE assets SET payload=$2 WHERE id=$1',[id,payload]);
+  await collection(db,'assets').updateOne({_id:id},{$set:{payload}});
   return {data:payload};
 }
 export async function playbackUrl(db,id,viewer,client=storageClient()) {
-  const row=await one(db,'SELECT * FROM assets WHERE id=$1',[id]);
+  const row=await collection(db,'assets').findOne({_id:id});
   if(!row) fail(404,'NOT_FOUND','Asset not found');
   requireThat(row.payload.state==='ready' && row.attached_message_id,'Asset unavailable','CLOUD_EXPIRED',410);
   const msg=await messageRecord(db,row.attached_message_id);

@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { one, datasetTime } from './database.mjs';
+import { collection,datasetTime } from './database.mjs';
 import { activeCloud, cloudRecord, contains, expireMessage, geometryValid, messageRecord, publicMessage, saveCloud } from './records.mjs';
 import { exact, fail, messageInput, outlineVertices, requireThat, validate } from './validation.mjs';
 import { rateLimit } from './auth.mjs';
+import { artworkCorners,distanceM,pointGeometry } from './geometry.mjs';
 
 export async function createMessage(db, cloudId, input, user) {
   messageInput(input);
@@ -11,7 +12,7 @@ export async function createMessage(db, cloudId, input, user) {
   await rateLimit(db,user.id,'post',10);
   let asset;
   if (input.assetId) {
-    asset = await one(db,'SELECT * FROM assets WHERE id=$1',[input.assetId]);
+    asset = await collection(db,'assets').findOne({_id:input.assetId});
     requireThat(asset && asset.owner_id === user.id, 'Owned asset required', 'FORBIDDEN',403);
     requireThat(asset.payload.state === 'ready' && asset.payload.kind === input.kind && !asset.attached_message_id, 'Ready unused asset of matching kind required');
   }
@@ -20,21 +21,11 @@ export async function createMessage(db, cloudId, input, user) {
   if (artwork) {
     // Four corners define the rectangle in world coordinates. Caller-supplied
     // control points cannot smuggle unrelated geographic coordinates.
-    const {longitude:lon,latitude:lat} = input.anchor;
-    const theta = artwork.rotationDeg * Math.PI/180;
-    const controls = [];
-    for (const [x,y] of [[-1,-1],[1,-1],[1,1],[-1,1]]) {
-      const east = x*artwork.widthM/2*Math.cos(theta)+y*artwork.heightM/2*Math.sin(theta);
-      const north = -x*artwork.widthM/2*Math.sin(theta)+y*artwork.heightM/2*Math.cos(theta);
-      const p = await one(db,`SELECT ST_X(g) AS longitude,ST_Y(g) AS latitude FROM (SELECT ST_Project(ST_SetSRID(ST_MakePoint($1,$2),4326)::geography,$3::float8,$4::float8)::geometry g) q`,[lon,lat,Math.hypot(east,north),Math.atan2(east,north)]);
-      controls.push(p);
-    }
-    artwork.controlPoints = controls;
+    artwork.controlPoints=artworkCorners(input.anchor,artwork);
   }
   const msg = validate('Message',{id,version:1,cloudId,authorId:user.id,kind:input.kind,anchor:input.anchor,createdAt:at,updatedAt:at,expiredAt:null,voteCount:0,viewerHasUpvoted:false,body:input.body??null,assetId:input.assetId??null,songUrl:input.songUrl??null,artworkTransform:artwork});
-  await db.query(`INSERT INTO messages(id,cloud_id,author_id,asset_id,payload,anchor,strokes,position_at)
-    VALUES($1,$2,$3,$4,$5,ST_SetSRID(ST_MakePoint($6,$7),4326),$8,$9)`,[id,cloudId,user.id,input.assetId??null,msg,input.anchor.longitude,input.anchor.latitude,input.strokes?JSON.stringify(input.strokes):null,at]);
-  if (asset) await db.query('UPDATE assets SET attached_message_id=$2 WHERE id=$1',[asset.id,id]);
+  await collection(db,'messages').insertOne({_id:id,id,cloud_id:cloudId,author_id:user.id,asset_id:input.assetId??null,payload:msg,anchor:pointGeometry(input.anchor),strokes:input.strokes??null,position_at:new Date(at),expired_at:null,held:false});
+  if(asset)await collection(db,'assets').updateOne({_id:asset.id},{$set:{attached_message_id:id}});
   return {data:msg};
 }
 export async function deleteMessage(db,id,user) {
@@ -48,11 +39,11 @@ export async function upvote(db,id,input,user) {
   exact(input,['active']); requireThat(typeof input.active === 'boolean','active must be boolean');
   const row = await messageRecord(db,id);
   if (!await publicMessage(db,row,user.id)) fail(410,'CLOUD_EXPIRED','Message unavailable');
-  const existing = await one(db,'SELECT 1 FROM votes WHERE message_id=$1 AND user_id=$2',[id,user.id]);
+  const existing=await collection(db,'votes').findOne({message_id:id,user_id:user.id});
   if (!!existing !== input.active) {
     await rateLimit(db,user.id,'vote',60);
-    if (input.active) await db.query('INSERT INTO votes(message_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[id,user.id]);
-    else await db.query('DELETE FROM votes WHERE message_id=$1 AND user_id=$2',[id,user.id]);
+    if(input.active)await collection(db,'votes').insertOne({_id:JSON.stringify([id,user.id]),message_id:id,user_id:user.id});
+    else await collection(db,'votes').deleteOne({message_id:id,user_id:user.id});
   }
   // Voting does not move the parcel or invalidate worker anchor versions.
   const msg = await publicMessage(db,row,user.id);
@@ -63,9 +54,7 @@ export async function createCloud(db,input,user) {
   const vertices = outlineVertices(input.outline);
   await geometryValid(db,input.outline);
   // Pairwise geodesic distances enforce diameter, including diagonal vertices.
-  const extent = await one(db,`WITH p AS (SELECT ST_SetSRID(ST_MakePoint((v->>0)::float8,(v->>1)::float8),4326)::geography g FROM jsonb_array_elements($1::jsonb) v)
-    SELECT max(ST_Distance(a.g,b.g)) AS diameter FROM p a CROSS JOIN p b`,[JSON.stringify(vertices)]);
-  requireThat(extent.diameter <= 10000,'Outline diameter exceeds 10 km');
+  for(const [longitude,latitude]of vertices)for(const [lng,lat]of vertices) requireThat(distanceM({longitude,latitude},{longitude:lng,latitude:lat})<=10000,'Outline diameter exceeds 10 km');
   const dsId = process.env.DRIFT_DATASET_ID;
   if (!dsId) fail(503,'NOT_CONFIGURED','DRIFT_DATASET_ID required');
   const ds = await datasetTime(db,dsId);
@@ -82,8 +71,8 @@ export async function deleteCloud(db,id,user) {
   if (!c.deleted_at) {
     const at = c.ds.clock.toISOString();
     await saveCloud(db,{...c.payload,status:'expired',version:c.payload.version+1,updatedAt:at});
-    await db.query('UPDATE clouds SET deleted_at=now() WHERE id=$1',[id]);
-    for (const m of (await db.query('SELECT id FROM messages WHERE cloud_id=$1',[id])).rows) await expireMessage(db,m.id,at);
+    await collection(db,'clouds').updateOne({_id:id},{$set:{deleted_at:db.now??new Date()}});
+    for(const m of await collection(db,'messages').find({cloud_id:id}).toArray())await expireMessage(db,m.id,at);
   }
   return {data:{id,expired:true}};
 }

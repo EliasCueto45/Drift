@@ -1,46 +1,44 @@
-import { one } from './database.mjs';
+import { collection,datasetTime } from './database.mjs';
 import { expireMessage } from './records.mjs';
-import { storageClient, objectCommand, DeleteObjectCommand } from './storage.mjs';
+import { storageClient,objectCommand,DeleteObjectCommand } from './storage.mjs';
 
-export async function cleanup(db,makeClient=storageClient,batchSize=100) {
-  const due=(await db.query(`SELECT m.id, CASE WHEN d.mode='replay' THEN d.observed_at ELSE now() END AS clock
-    FROM messages m JOIN clouds c ON c.id=m.cloud_id JOIN datasets d ON d.id=c.dataset_id
-    WHERE m.expired_at IS NULL AND (c.deleted_at IS NOT NULL OR (c.payload->>'expiresAt')::timestamptz <= CASE WHEN d.mode='replay' THEN d.observed_at ELSE now() END)
-    LIMIT $1`,[batchSize])).rows;
-  for(const m of due) await expireMessage(db,m.id,m.clock.toISOString());
-  let completed=0,failed=0;
-  for(const job of (await db.query('SELECT message_id FROM cleanup_jobs ORDER BY queued_at LIMIT $1',[batchSize])).rows) {
-    const m=await one(db,'SELECT * FROM messages WHERE id=$1',[job.message_id]);
-    try {
-      if(m.asset_id) {
-        const a=await one(db,'SELECT * FROM assets WHERE id=$1',[m.asset_id]);
-        const client=makeClient();
-        await client.send(objectCommand(DeleteObjectCommand,a.upload_key));
-        await client.send(objectCommand(DeleteObjectCommand,a.object_key));
-        await db.query("UPDATE assets SET payload=jsonb_set(payload,'{state}','\"deleted\"'::jsonb),attached_message_id=NULL WHERE id=$1",[a.id]);
-      }
-      await db.query('DELETE FROM cleanup_jobs WHERE message_id=$1',[m.id]);
-      await db.query('DELETE FROM messages WHERE id=$1',[m.id]);
-      completed++;
-    } catch {
-      // No body, media contents or credentials in logs/errors.
-      await db.query('UPDATE cleanup_jobs SET attempts=attempts+1 WHERE message_id=$1',[m.id]); failed++;
+export async function cleanup(db,makeClient=storageClient,batchSize=100){
+  const clouds=await collection(db,'clouds').find({$or:[{deleted_at:{$ne:null}},{'payload.expiresAt':{$type:'string'}}]}).toArray();
+  let remaining=batchSize;
+  for(const c of clouds){
+    if(remaining<=0)break;
+    const ds=await datasetTime(db,c.dataset_id);
+    if(!c.deleted_at&&Date.parse(c.payload.expiresAt)>ds.clock.getTime())continue;
+    for(const m of await collection(db,'messages').find({cloud_id:c.id,expired_at:null}).limit(remaining).toArray()){
+      await expireMessage(db,m.id,ds.clock.toISOString());remaining--;
     }
   }
-  // Include ready-but-abandoned uploads and expired staging keys. Ready attached
-  // assets only lose their staging object, so PUT retries cannot alter playback.
-  const orphans=(await db.query(`SELECT * FROM assets WHERE payload->>'state'<>'deleted' AND upload_expires_at<now()
-    AND (attached_message_id IS NOT NULL OR created_at<now()-interval '24 hours') LIMIT $1`,[batchSize])).rows;
-  for(const a of orphans) {
+  let completed=0,failed=0;
+  for(const job of await collection(db,'cleanup_jobs').find().sort({queued_at:1}).limit(batchSize).toArray()){
+    const m=await collection(db,'messages').findOne({_id:job.message_id});
+    if(!m){await collection(db,'cleanup_jobs').deleteOne({_id:job._id});continue;}
+    const asset=m.asset_id?await collection(db,'assets').findOne({_id:m.asset_id}):null;
     try {
-      const client=makeClient(); await client.send(objectCommand(DeleteObjectCommand,a.upload_key));
-      if(!a.attached_message_id) {
-        await client.send(objectCommand(DeleteObjectCommand,a.object_key));
-        await db.query("UPDATE assets SET payload=jsonb_set(payload,'{state}','\"deleted\"'::jsonb) WHERE id=$1",[a.id]);
-      }
-    } catch { failed++; }
+      // Deterministic DeleteObject keys are idempotent when a transaction retries.
+      if(asset){const client=makeClient();await client.send(objectCommand(DeleteObjectCommand,asset.upload_key));await client.send(objectCommand(DeleteObjectCommand,asset.object_key));}
+    }catch{
+      await collection(db,'cleanup_jobs').updateOne({_id:job._id},{$inc:{attempts:1}});failed++;continue;
+    }
+    if(asset)await collection(db,'assets').updateOne({_id:asset.id},{$set:{'payload.state':'deleted',attached_message_id:null,staging_deleted:true}});
+    await collection(db,'votes').deleteMany({message_id:m.id});
+    await collection(db,'messages').deleteOne({_id:m.id});
+    await collection(db,'cleanup_jobs').deleteOne({_id:job._id});completed++;
   }
-  await db.query('DELETE FROM query_snapshots WHERE expires_at<now()');
-  await db.query("DELETE FROM rate_windows WHERE window_at<now()-interval '2 minutes'");
+  const now=db.now??new Date();
+  const orphans=await collection(db,'assets').find({'payload.state':{$ne:'deleted'},upload_expires_at:{$lt:now},$or:[{attached_message_id:{$type:'string'},staging_deleted:{$ne:true}},{attached_message_id:null,created_at:{$lt:new Date(now.getTime()-86400000)}}]}).limit(batchSize).toArray();
+  for(const a of orphans){
+    try{
+      const client=makeClient();await client.send(objectCommand(DeleteObjectCommand,a.upload_key));
+      if(!a.attached_message_id)await client.send(objectCommand(DeleteObjectCommand,a.object_key));
+    }catch{failed++;continue;}
+    await collection(db,'assets').updateOne({_id:a.id},{$set:{staging_deleted:true,...(!a.attached_message_id?{'payload.state':'deleted'}:{})}});
+  }
+  // TTL indexes are a backstop. Explicit deletion keeps cursor metadata bounded.
+  for(const name of ['query_snapshots','snapshot_items','rate_windows'])await collection(db,name).deleteMany({expires_at:{$lt:now}});
   return {completed,failed};
 }
