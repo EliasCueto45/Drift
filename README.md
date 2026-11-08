@@ -64,7 +64,7 @@ docs/decisions/                    reviewed architecture/contract changes
 | Created cloud | Label **Created cloud**, show creator, advect with wind, expire 24 hours after creation. All message types work on it. |
 | Rain/storm | Change visual styling; retain posting/media behavior. Rain alone does not delete notes. |
 | Night | Use appropriate infrared/cloud-mask data; visible-image darkness is not disappearance. |
-| Missing data | Show **Estimated** or **Stale**. Stop extrapolating after 30 minutes; never treat an outage as dissipation. An optional local last-known cloud snapshot also survives Atlas outages and page reloads; show its observation age and keep it read-only. Message bodies are not stored in that fallback. |
+| Missing data | Show **Estimated** or **Stale**. Stop extrapolating after 30 minutes; never treat an outage as dissipation. An optional local last-known cloud snapshot also survives Atlas outages and page reloads; show its observation age. Staleness does not disable posting or cloud creation; normal server validation still applies. Message bodies are not stored in that fallback. |
 
 Created clouds are independent synthetic objects: they never automatically merge with observed clouds or each other. Overlapping layers must be selectable. Use an assumed altitude of 2 km, labeled as estimated. Creator deletion expires its contents; editing its published outline is outside the MVP. Anyone with a Clerk or anonymous posting session can post to it.
 

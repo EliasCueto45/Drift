@@ -112,7 +112,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     patch: patchSky,
     lastKnown,
   } = useSky(api, viewer, datasetId);
-  const readOnlySky = lastKnown || freshness === "stale";
+  const staleSky = lastKnown || freshness === "stale";
   const clouds: CloudWithPreviews[] = receivedClouds
     .filter((c) => !removedClouds.has(c.cloud.id))
     .map((c) => ({
@@ -533,20 +533,18 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   // Indoors (user mode) nothing is selectable, so open panels and drafts hide until outside.
   const selected = skyClouds.find((c) => c.cloud.id === selectedId) ?? null;
   const draftCloud = draft ? (skyClouds.find((c) => c.cloud.id === draft.cloudId) ?? null) : null;
-  const activeDraft = draft && draftCloud && !readOnlySky ? draft : null;
+  const activeDraft = draft && draftCloud ? draft : null;
   // Placing: after the dock's cloud button, the next tap on any cloud picks the cloud and the spot.
   const placingNow = placing && view !== "welcome" && !indoorBlocked;
-  const sheetItem = !lastKnown ? skyClouds.find((c) => c.cloud.id === sheetId) ?? null : null;
+  const sheetItem = skyClouds.find((c) => c.cloud.id === sheetId) ?? null;
   const composing = Boolean(activeDraft) && !placingNow;
 
   function startPost() {
-    if (readOnlySky) { notify("Showing the last known sky. Posting resumes when live data reconnects."); return; }
     setSheetId(null);
     setSelectedId(null);
     setPlacing(true);
   }
   function onTap(id: string | null) {
-    if (lastKnown) { notify("These are saved cloud positions. Posts return when the database reconnects."); return; }
     if (draft) return;
     setSelectedId(id);
     const target =
@@ -569,7 +567,6 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     }
   }
   function onPlace(cloudId: string, anchor: Anchor) {
-    if (readOnlySky) { notify("This is the last known sky. Wait for the connection before posting."); return; }
     if (clouds.find((c) => c.cloud.id === cloudId)?.cloud.status !== "active") {
       notify("That cloud isn't taking new posts right now. Pick another one.");
       return;
@@ -604,7 +601,6 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     notify("Tap inside a cloud to place your post.");
   }
   function openCloud(id: string) {
-    if (lastKnown) { notify("Posts need the database connection. Showing saved cloud positions for now."); return; }
     setSheetId(id);
   }
   const onDraftText = useCallback(
@@ -636,7 +632,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
   // ---- Chrome ----
   const fresh = freshnessText(freshness, asOf, synthetic);
-  const showPanel = selected && !lastKnown && !placingNow && !activeDraft && !sheetId && view !== "welcome";
+  const showPanel = selected && !placingNow && !activeDraft && !sheetId && view !== "welcome";
 
   const inView = summary?.visible ?? 0;
   const stageLabel = `${view === "simulated" ? "Simulated sky" : "Camera view of the sky"}. ${inView} tracked cloud${inView === 1 ? "" : "s"} in view. Posts are listed when you select a cloud.`;
@@ -646,8 +642,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     hint = <>Point your camera at the sky…</>;
   } else if (indoorBlocked) {
     hint = <>Clouds and posts only appear outside. Step outdoors and point your camera at the sky.</>;
-  } else if (readOnlySky && view !== "welcome") {
-    hint = <>Showing the last known sky. {lastKnown ? "Cloud positions only; posts need the connection." : "Waiting for fresh data."} Retrying…</>;
+  } else if (staleSky && view !== "welcome" && !placingNow) {
+    hint = <>Showing the last known sky. Retrying the connection…</>;
   } else if (view === "camera" || view === "simulated") {
     if (placingNow) {
       hint = (
@@ -731,7 +727,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       {(view === "camera" || view === "simulated" || view === "welcome") && (
         <SkyStage
           onCaptureReady={onCaptureReady}
-          snapshotLabel={synthetic ? "Synthetic cloud data" : readOnlySky ? "Last known sky" : view !== "camera" ? "Simulated sky" : undefined}
+          snapshotLabel={synthetic ? "Synthetic cloud data" : staleSky ? "Last known sky" : view !== "camera" ? "Simulated sky" : undefined}
           mode={view === "camera" ? "camera" : "simulated"}
           stream={stream}
           getPose={view === "camera" ? getCameraPose : getSimPose}
@@ -815,7 +811,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
               Location off · assuming Troy, NY
             </span>
           )}
-          {view !== "welcome" && !readOnlySky && !indoorBlocked && !composing && !sheetItem && (
+          {view !== "welcome" && !indoorBlocked && !composing && !sheetItem && (
             <button
               type="button"
               className={styles.signInButton}
@@ -879,7 +875,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
               <X size={20} aria-hidden="true" />
             </button>
           )}
-          {!readOnlySky && !placingNow && !indoorBlocked && clouds.length > 0 ? (
+          {!placingNow && !indoorBlocked && clouds.length > 0 ? (
             <button type="button" className={`${styles.roundButton} ${styles.postButton}`} onClick={startPost} aria-label="Write a post on a cloud">
               <CloudIcon size={40} strokeWidth={1.75} aria-hidden="true" />
             </button>
@@ -921,7 +917,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           onClose={() => setSheetId(null)}
         />
       )}
-      {creatingCloud && !readOnlySky && !indoorBlocked && (
+      {creatingCloud && !indoorBlocked && (
         <CloudCreator
           viewer={viewer}
           datasetId={datasetId}
