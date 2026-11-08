@@ -8,7 +8,7 @@ Compatibility verification completed: 88 combined backend, canonical-contract an
 
 ## Python backend integration
 
-Current commands and runtime are in the root README and `db/README.md`. Worker integration launchers now use `sys.executable -m drift_tools.backend_harness` and a disposable MongoDB replica set; the shared mock and smoke tools also run in Python. Set `DRIFT_TEST_BACKEND=1` to include real API/database tests. Scientific tracking logic and canonical schema v1 payloads are unchanged by this port. Historical Node/PostGIS notes below describe earlier revisions; final browser/current-sky acceptance remains open.
+Current commands and runtime are in the root README and `docs/DATABASE.md`. Worker integration launchers now use `sys.executable -m drift_tools.backend_harness` and a disposable MongoDB replica set; the shared mock and smoke tools also run in Python. Set `DRIFT_TEST_BACKEND=1` to include real API/database tests. Scientific tracking logic and canonical schema v1 payloads are unchanged by this port. Historical Node/PostGIS notes below describe earlier revisions; final browser/current-sky acceptance remains open.
 
 ## Integration with unmerged Owner 2 backend (`69f1f00`)
 

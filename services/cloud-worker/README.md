@@ -18,7 +18,7 @@ uv run --project services/cloud-worker --locked python services/cloud-worker/tes
 
 This creates a disposable embedded backend, provisions an isolated live dataset, discovers current NOAA products, publishes actual worker batches, and verifies persistence and the sky read route. It uses a fresh local state directory on every invocation because the database is disposable. It does not test Clerk, actual S3, a deployed Next host, or ordinary PostgreSQL multi-session behavior. The latest check ingested two current observations and returned one cloud with live freshness; it also exposed and led to a fix for NumPy confidence serialization at the outbox/checkpoint boundary.
 
-For the final product, use the production backend host and its separately provisioned `troy-live` dataset with the continuous supervisor; do not deploy the test harness. See `db/README.md` for Owner 2's database migration/provisioning commands.
+For the final product, use the production backend host and its separately provisioned `troy-live` dataset with the continuous supervisor; do not deploy the test harness. See [database setup](../../docs/DATABASE.md) for Owner 2's database initialization/provisioning commands.
 
 ## Run from a clean clone
 

@@ -4,7 +4,7 @@ Use Python 3.12 and the root `requirements.lock.txt`. Install the root project a
 
 ## Private configuration
 
-Keep shared settings in the ignored root `.env` and server settings in the ignored `apps/web/.env.local`. The latter overrides file defaults; explicitly exported process variables override both files. Existing local keys are accepted. Examples in `.env.example` and `db/.env.example` contain placeholders only.
+Keep shared settings in the ignored root `.env` and server settings in the ignored `apps/web/.env.local`. The latter overrides file defaults; explicitly exported process variables override both files. Existing local keys are accepted. The [root environment template](../.env.example) is the single API/database configuration example and contains placeholders only. The database implementation lives in `apps/web/src/server/drift_api/database.py`; this document is setup guidance, not a separate database layer.
 
 - `MONGODB_URI`: Atlas Drivers connection string, with a database user/password URL-encoded. `MONGODB_DB` defaults to `drift`. Atlas database users and network access must allow the machine running the API; no Atlas management API key is needed for normal database connections.
 - `CLERK_PUBLISHABLE_KEY` (or the existing `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) and full `CLERK_SECRET_KEY`: from the same Clerk application. The API uses JWKS/RS256 session verification and retrieves only public profile fields. `DRIFT_APP_ORIGIN` is the browser origin, without a trailing slash.
