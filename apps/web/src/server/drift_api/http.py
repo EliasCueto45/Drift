@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import os
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -16,6 +17,8 @@ from .storage import artwork, complete_asset, playback_url, upload_url
 from .tracking import ingest, tracking_state
 from .validation import ApiError, fail, require, validate
 from .idempotency import create_once
+from .anonymous import COOKIE, SESSION_DAYS, anonymous_identity, new_token, start_session
+from .streaks import posting_streak, time_zone
 
 
 async def read_json(request, maximum=2 * 1024 * 1024):
@@ -57,6 +60,8 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
             path, method, params = "/" + path, request.method, request.query_params
             execute, user, status = None, None, 200
             create_kind = None
+            guest_allowed = False
+            session_route = path == "/api/v1/session/anonymous"
             if path.startswith("/api/internal/"):
                 worker(request)
                 if path == "/api/internal/tracking/batches" and method == "POST":
@@ -72,10 +77,29 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                 writes = method in ("POST", "PUT", "DELETE", "PATCH")
                 if writes:
                     check_origin(request)
-                user = await run_in_threadpool(identity, writes, request)
-                if writes and not user:
+                user = await run_in_threadpool(
+                    identity, writes and not session_route and not request.cookies.get(COOKIE), request
+                )
+                if writes and not user and not request.cookies.get(COOKIE) and not session_route:
                     fail(401, "UNAUTHENTICATED", "Sign in required")
-                if path == "/api/v1/sky" and method == "GET":
+                if session_route and method == "POST":
+                    body = await read_json(request)
+                    require(body == {}, "Anonymous session request must be an empty object")
+                    time_zone(request.headers.get("x-drift-time-zone"))
+                    candidate = new_token()
+
+                    def execute(ctx):
+                        return start_session(ctx, request.cookies.get(COOKIE), candidate)
+                elif session_route and method == "GET":
+
+                    def execute(ctx):
+                        return {"data": anonymous_identity(ctx, request.cookies.get(COOKIE))}
+                elif path == "/api/v1/me/streak" and method == "GET":
+
+                    def execute(ctx):
+                        require(user, "Posting session required", "UNAUTHENTICATED", 401)
+                        return posting_streak(ctx, user, request.headers.get("x-drift-time-zone"))
+                elif path == "/api/v1/sky" and method == "GET":
 
                     def execute(ctx):
                         return sky(ctx, params, user)
@@ -99,6 +123,7 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                     body = await read_json(request)
                     execute, status = lambda ctx: create_cloud(ctx, body, user), 201
                     create_kind = "cloud"
+                    guest_allowed = True
                 elif match := re.fullmatch(r"/api/v1/clouds/([^/]+)/messages", path):
                     id = match[1]
                     if method == "GET":
@@ -107,8 +132,14 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                             return message_page(ctx, id, params, user)
                     elif method == "POST":
                         body = await read_json(request)
-                        execute, status = lambda ctx: create_message(ctx, id, body, user), 201
+                        execute, status = (
+                            lambda ctx: create_message(
+                                ctx, id, body, user, request.headers.get("x-drift-time-zone")
+                            ),
+                            201,
+                        )
                         create_kind = "message"
+                        guest_allowed = True
                 elif match := re.fullmatch(r"/api/v1/clouds/([^/]+)", path):
                     id = match[1]
                     if method == "GET":
@@ -116,6 +147,7 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                         def execute(ctx):
                             return cloud_detail(ctx, id)
                     elif method == "DELETE":
+                        guest_allowed = True
 
                         def execute(ctx):
                             return delete_cloud(ctx, id, user)
@@ -126,6 +158,7 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                         return upvote(ctx, id, body, user)
                 elif (match := re.fullmatch(r"/api/v1/messages/([^/]+)", path)) and method == "DELETE":
                     id = match[1]
+                    guest_allowed = True
 
                     def execute(ctx):
                         return delete_message(ctx, id, user)
@@ -169,6 +202,18 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                 fail(404, "NOT_FOUND", "Route not found")
 
             def perform(ctx):
+                nonlocal user
+                if not path.startswith("/api/internal/"):
+                    if not user:
+                        user = anonymous_identity(ctx, request.cookies.get(COOKIE))
+                    if method in ("POST", "PUT", "DELETE", "PATCH") and not session_route:
+                        require(user, "Posting session required", "UNAUTHENTICATED", 401)
+                        require(
+                            not user.get("isAnonymous") or guest_allowed,
+                            "Sign in to vote or upload media",
+                            "UNAUTHENTICATED",
+                            401,
+                        )
                 upsert_profile(ctx, user)
                 if create_kind:
                     return create_once(
@@ -177,7 +222,20 @@ def create_app(identity=request_identity, run=transaction, worker=worker_auth):
                 return execute(ctx)
 
             result = await run_in_threadpool(run, perform)
-            return JSONResponse(result, status_code=status, headers=headers)
+            session_token = result.pop("_session_token", None)
+            response = JSONResponse(result, status_code=status, headers=headers)
+            if session_token:
+                secure = (os.getenv("DRIFT_APP_ORIGIN") or str(request.base_url)).startswith("https://")
+                response.set_cookie(
+                    COOKIE,
+                    session_token,
+                    max_age=SESSION_DAYS * 86400,
+                    httponly=True,
+                    secure=secure,
+                    samesite="lax",
+                    path="/api",
+                )
+            return response
         except ApiError as error:
             return JSONResponse(
                 {"error": {"code": error.code, "message": error.message, "requestId": request_id}},
