@@ -47,7 +47,7 @@ const devAuth = process.env.NEXT_PUBLIC_DRIFT_DEV_AUTH === "mock";
 export function DriftAuthProvider({ children }: { children: ReactNode }) {
   if (publishableKey) {
     return (
-      <ClerkProvider publishableKey={publishableKey}>
+      <ClerkProvider publishableKey={publishableKey} appearance={{ options: { logoImageUrl: "/brand/drift-logo.png", logoLinkUrl: "/" } }}>
         <ClerkBridge>{children}</ClerkBridge>
       </ClerkProvider>
     );

@@ -1,4 +1,6 @@
 "use client";
+import { Camera, Map as MapIcon, Orbit } from "lucide-react";
+import { DriftLogo } from "@/features/brand/DriftLogo";
 import { Camera, Check, Copy, Map as MapIcon, Orbit, RotateCcw, Sun } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import styles from "./onboarding.module.css";
@@ -43,7 +45,7 @@ export function Onboarding({
   return (
     <section className={styles.sheet} aria-labelledby="onboarding-title">
       <h1 id="onboarding-title" className={styles.title}>
-        Drift
+        <DriftLogo variant="welcome" preload />
       </h1>
       <p className={styles.lede}>
         Words written on real clouds. Look up to read them, leave one of your own, and let the wind carry it to whoever is under that cloud next.

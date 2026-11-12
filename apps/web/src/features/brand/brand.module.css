@@ -1,0 +1,6 @@
+.logo { display: block; height: auto; object-fit: contain; flex: none; background: #609fed; }
+.welcome { width: min(224px, 52vw); border-radius: 18px; }
+.compact { width: 88px; border-radius: 10px; }
+.small { width: 64px; border-radius: 8px; }
+@media (max-width: 400px) { .compact { width: 72px; } }
+@media (max-height: 700px) { .welcome { width: 160px; } }

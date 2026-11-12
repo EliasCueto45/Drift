@@ -58,6 +58,7 @@ import styles from "./sky.module.css";
 import { PostingStreakBadge } from "@/features/composer/PostingStreakBadge";
 import { SnapshotButton } from "./SnapshotButton";
 import type { SnapshotCapture } from "./snapshot";
+import { DriftLogo } from "@/features/brand/DriftLogo";
 
 type View = "welcome" | "camera" | "simulated" | "map";
 
@@ -113,7 +114,9 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     asOf,
     refresh: refreshSky,
     patch: patchSky,
+    lastKnown,
   } = useSky(api, viewer, datasetId);
+  const staleSky = lastKnown || freshness === "stale";
   const clouds: CloudWithPreviews[] = receivedClouds
     .filter((c) => !removedClouds.has(c.cloud.id))
     .map((c) => ({
@@ -639,6 +642,9 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
   function onPlaceMiss() {
     notify("Tap inside a cloud to place your post.");
   }
+  function openCloud(id: string) {
+    setSheetId(id);
+  }
   const onDraftText = useCallback(
     (text: string) =>
       setDraft((d) => (d && d.text !== text ? { ...d, text } : d)),
@@ -702,6 +708,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
     hint = <>Point your camera at the sky…</>;
   } else if (indoorBlocked) {
     hint = <>Clouds and posts only appear outside. Step outdoors and point your camera at the sky.</>;
+  } else if (staleSky && view !== "welcome" && !placingNow) {
+    hint = <>Showing the last known sky. Retrying the connection…</>;
   } else if (view === "camera" || view === "simulated") {
     if (placingNow) {
       hint = (
@@ -758,7 +766,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
       {(view === "camera" || view === "simulated" || view === "welcome") && (
         <SkyStage
           onCaptureReady={onCaptureReady}
-          snapshotLabel={synthetic ? "Synthetic cloud data" : view !== "camera" ? "Simulated sky" : undefined}
+          snapshotLabel={synthetic ? "Synthetic cloud data" : staleSky ? "Last known sky" : view !== "camera" ? "Simulated sky" : undefined}
           mode={view === "camera" ? "camera" : "simulated"}
           stream={stream}
           getPose={view === "camera" ? getCameraPose : getSimPose}
@@ -768,7 +776,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           placing={placingNow}
           draft={activeDraft}
           onTap={view === "welcome" ? noop : onTap}
-          onOpen={view === "welcome" ? noop : setSheetId}
+          onOpen={view === "welcome" ? noop : openCloud}
           onPlace={onPlace}
           onPlaceMiss={onPlaceMiss}
           onPan={view === "simulated" ? panSim : undefined}
@@ -798,8 +806,8 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
           selectedId={selectedId}
           placing={placingNow}
           draft={activeDraft}
-          onSelect={(id) => !draft && setSelectedId(id)}
-          onOpen={setSheetId}
+          onSelect={(id) => !draft && onTap(id)}
+          onOpen={openCloud}
           onPlace={onPlace}
           onPlaceMiss={onPlaceMiss}
         />
@@ -807,6 +815,7 @@ export function DriftApp({ datasetId, initialView, devParam = null }: { datasetI
 
       <header className={styles.topbar} hidden={onCloud}>
         <div className={styles.pills}>
+          {view !== "welcome" && view !== "camera" && <DriftLogo />}
           {view !== "welcome" && <PostingStreakBadge className={styles.pill} />}
           {/* Five quick taps switch on developer mode (hidden from users on purpose). */}
           <span className={styles.pill} data-tone={fresh.tone} role="status" onClick={onStatusTap}>

@@ -14,6 +14,7 @@ from .cli import main as worker_main
 from .delivery import TransportUnavailable
 from .models import iso
 from .state import decode
+from .wind import WindField
 
 UTC = timezone.utc
 GRID = {"crs":"EPSG:32618", "x0":548000, "y0":4678000, "cell_m":1000, "width":128, "height":128}
@@ -121,6 +122,24 @@ def atomic_json(path, data):
     temporary.replace(path)
 
 
+def write_last_known_sky(state_dir, dataset_id, run_id):
+    """Export acknowledged public cloud geometry only, never an unaccepted pending batch."""
+    journal_path = state_dir / "journal.json"
+    if not journal_path.exists():
+        return
+    engine = decode(json.loads(journal_path.read_text(encoding="utf-8"))["checkpoint"])
+    if (engine.dataset_id, engine.run_id) != (dataset_id, run_id):
+        raise ValueError("last-known sky dataset/run mismatch")
+    if not engine.previous:
+        return
+    at = engine.previous.observed_at
+    clouds = [engine.snapshot(track, WindField(), at) for track in engine.tracks.values()
+              if track.status not in ("expired", "out_of_region")]
+    atomic_json(state_dir / "last-known-sky.json", {
+        "datasetId": dataset_id, "asOf": iso(at), "clouds": clouds,
+    })
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Current real-sky NOAA acquisition for Drift")
     parser.add_argument("--bucket",default="noaa-goes19")
@@ -146,6 +165,7 @@ def main(argv=None):
         while True:
             now = datetime.now(UTC)
             try:
+                write_last_known_sky(args.state_dir, args.dataset, args.run_id)
                 manifest = discover(catalog,now)
                 manifest["grid"] = coverage_grid(args.state_dir)
                 path = args.state_dir/"current-manifest.json"
@@ -156,6 +176,7 @@ def main(argv=None):
                 if args.publish:
                     command.append("--publish")
                 code = worker_main(command, propagate_transport_errors=True)
+                write_last_known_sky(args.state_dir, args.dataset, args.run_id)
                 latest = acquisition_time(manifest["observations"][-1]["mask"])
                 status = {"checkedAt":iso(datetime.now(UTC)),"observationAt":iso(latest),
                           "datasetId":args.dataset,"synthetic":False,"status":"live" if code == 0 else "error",
